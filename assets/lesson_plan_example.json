@@ -1,0 +1,111 @@
+{
+  "header": {
+    "division": "SCHOOLS DIVISION OF ALBAY",
+    "school": "SAN ANTONIO NATIONAL HIGH SCHOOL"
+  },
+  "lesson_info": {
+    "title": "Realizing the Value of Doing Philosophy in Obtaining a Broad Perspective on Life",
+    "learning_area": "Social Science 12",
+    "teacher": "Jhunrie G. Bayog",
+    "grade_level_sections": ["12 – Newton", "12 – Curie", "12 – Archerfish"],
+    "num_sessions": "4 days",
+    "references": [
+      "Plato's Apology (Socrates' \"The unexamined life is not worth living\")",
+      "Kolb's Experiential Learning Cycle Framework"
+    ],
+    "ai_declaration": "AI was used to check the grammar and spelling, improve language clarity, formatting support, and translation assistance. It was also used to rephrase, organize, and refine texts. It suggests useful links that are very relevant to the lesson."
+  },
+  "intentions": {
+    "competency_standard": "Realize the value of doing philosophy in obtaining a broad perspective on life (PPT11/12-Ib-1.2).",
+    "objectives": {
+      "knowledge": "Differentiate between a ground-level partial perspective and a holistic \"helicopter\" perspective when evaluating life experiences.",
+      "skills": "Execute a systematic \"Philosophical Audit\" on a personal, everyday routine using Socratic questioning to extract a broader life perspective.",
+      "behavior": "Value open-mindedness by deliberately pausing automated behaviors to reflect on personal choices and long-term consequences."
+    }
+  },
+  "learner_context": "Students show better interest if the topic or activity is very much relevant to their own context. They have become very cooperative during group activity, especially because it involves their personal situation.",
+  "learning_experience": {
+    "resources": {
+      "HAYO": "Teacher-made \"Philosopher's Field Notebook\" and \"Helicopter View\" reflection sheets.",
+      "HINAY": "Shared digital Padlet board for class synthesis submissions."
+    },
+    "pre_lesson": {
+      "activity": "The Zoom-Out Mystery Game!",
+      "sub_activity": "The \"End of the World\" Free-Write (Concrete Experience)",
+      "directions": "Students will do a private, silent 3-minute free-write. They must recall a past event in their lives that felt absolutely devastating or like the \"end of the world\" at the time, focusing heavily on how they felt in that exact moment.",
+      "scoring": {
+        "2_points": "Completed the reflection with explicit focus on their past raw emotions.",
+        "1_point": "Completed the reflection superficially without emotional depth."
+      }
+    },
+    "flow": [
+      {
+        "day": 1,
+        "sections": [
+          {
+            "title": "CORE INQUIRY",
+            "content": "Realize the value of doing philosophy in obtaining a broad perspective on life (PPT11/12-Ib-1.2)."
+          },
+          {
+            "title": "GROUNDING THE MIND",
+            "directions": "On your fingers, show the class your stress levels regarding your current biggest worry, where 5 is \"completely overwhelmed\" and 1 is \"totally calm\"."
+          },
+          {
+            "title": "PHILOSOPHICAL INSIGHT",
+            "content": "The teacher introduces The Helicopter View framework to process the opening activity.",
+            "sub_sections": [
+              {
+                "title": "The Ground-Level View (Partial Perspective)",
+                "content": "Immediate emotions and necessity."
+              },
+              {
+                "title": "The Helicopter View (Holistic Perspective)",
+                "content": "Flying 1,000 feet above memory to see how events shaped them for the better."
+              }
+            ]
+          },
+          {
+            "title": "COLLECTIVE EXAMINATION",
+            "content": "Analyze a common, automatic teenage routine: Checking social media notifications immediately upon waking up."
+          }
+        ]
+      },
+      {
+        "day": 2,
+        "sections": [
+          {
+            "title": "INDEPENDENT PRAXIS",
+            "content": "The Philosophical Audit. Students identify a current problem and subject it to Socratic Interrogation: The Hidden Value, The Blindspot, The Horizon."
+          }
+        ]
+      },
+      {
+        "day": 3,
+        "sections": [
+          {
+            "title": "STOIC MATRIX INTERVENTION",
+            "content": "Dichotomy of Control (Externals vs. Agency)."
+          }
+        ]
+      },
+      {
+        "day": 4,
+        "sections": [
+          {
+            "title": "DIALECTICAL COUNSELING",
+            "content": "Peer collaboration as Philosophical Counselors."
+          },
+          {
+            "title": "LET’S REFLECT ON IT!",
+            "content": "Personal plan: \"I used to feel completely overwhelmed by [My Struggle] because... Today, I chose to focus on this by [One Specific Action].\""
+          }
+        ]
+      }
+    ]
+  },
+  "assessment": "Formative Assessment: Check \"The Philosophical Audit\" for an authentic shift in perspective from helplessness to agency.",
+  "ways_forward": {
+    "remediation": "Target card for one minor, 5-minute actionable daily task.",
+    "extension": "Analyze a local community issue (e.g., flooding or waste management)."
+  }
+}
