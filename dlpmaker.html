@@ -197,6 +197,8 @@
 
                 TONE RULE: Avoid administrative jargon. Speak as if you are directly guiding the teacher on how to talk to and engage the students. The language should be professional, immersive, and sophisticated.
 
+                FORMATTING RULE: If there are multiple segments or steps, separate them with <br><br> to ensure they don't pile up in a single paragraph. Use <b> tags for headers.
+
                 LANGUAGE RULE: Maintain the same language (Filipino or English) as the current segment text provided above.
 
                 Please rewrite this segment to fulfill the request. RETURN ONLY THE UPDATED TEXT.
@@ -430,12 +432,13 @@
                 - VARIETY IS KEY: Do NOT repeat the same routine every day. Use diverse strategies (Socratic Seminars, Gamified Challenges, Gallery Walks, Case Studies, etc.).
 
                 DAILY FLOW PRINCIPLES (Be creative and thematic with segment headers):
-                - For each session, create unique and appropriate headers for each segment of the flow (e.g., instead of "The Bridge", it could be "Pagtawid sa Bagong Kaalaman" or "Connecting the Dots").
+                - For each session, create unique and appropriate headers for each segment of the flow (e.g., "The Bridge", "Connecting the Dots", "The Deep Dive").
                 - The headers should reflect the specific activity or pedagogical goal of that segment.
                 - Ensure the flow generally moves from an engaging start, through deep immersion/interaction, to a meaningful check for understanding and assessment.
                 - Use HTML <b> tags for these headers.
+                - FORMATTING: Start each new segment on a NEW LINE using <br><br>. Do not group them into one narrative paragraph.
 
-                LANGUAGE RULE: Detect the language of the input. Use Filipino if the input is Filipino; otherwise, use English. IF FILIPINO, ENSURE ALL LABELS (like "The Bridge") ARE ALSO TRANSLATED TO FILIPINO.
+                LANGUAGE RULE: The lesson plan MUST be written in the same language as the provided "Competency" and "Standards". If they are in English, the entire output must be in English. If they are in Filipino, the output must be in Filipino. DO NOT mix languages.
 
                 RETURN A JSON OBJECT ONLY. NO MARKDOWN.
                 Structure:
@@ -445,8 +448,8 @@
                     "pre_lesson": "Overall unit hook script.",
                     "days": [
                         {
-                            "title": "Creative/Thematic Title",
-                            "content": "A wordy, sophisticated script of the session flow. Use your creative headers for each segment (e.g., <b>[Creative Header]:</b> [Content])."
+                            "title": "Creative/Thematic Title (e.g., 'The Anatomy of Boundaries'). DO NOT include the word 'Day' or its number here.",
+                            "content": "A wordy, sophisticated script of the session flow. Use your creative headers for each segment. IMPORTANT: Start each segment (Header + Content) with <br><br> to ensure vertical spacing."
                         }
                         // Generate exactly ${numDays} days
                     ],
