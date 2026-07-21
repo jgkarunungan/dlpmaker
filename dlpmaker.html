@@ -53,7 +53,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label for="subject" class="block text-sm font-medium text-gray-700">Subject</label>
                         <input type="text" id="subject" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm" placeholder="e.g., Introduction to Philosophy">
@@ -61,6 +61,16 @@
                     <div>
                         <label for="gradeLevel" class="block text-sm font-medium text-gray-700">Grade Level</label>
                         <input type="text" id="gradeLevel" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm" placeholder="e.g., 12">
+                    </div>
+                    <div>
+                        <label for="numDays" class="block text-sm font-medium text-gray-700">Number of Days</label>
+                        <select id="numDays" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="1">1 Day</option>
+                            <option value="2">2 Days</option>
+                            <option value="3">3 Days</option>
+                            <option value="4" selected>4 Days</option>
+                            <option value="5">5 Days</option>
+                        </select>
                     </div>
                 </div>
 
@@ -170,16 +180,27 @@
             btn.innerText = "REFINING...";
 
             const subject = document.getElementById('subject').value;
-            const context = currentParsedData[lastSelectedField];
+            let context = '';
+            if (lastSelectedField.startsWith('day_')) {
+                const index = parseInt(lastSelectedField.split('_')[1]);
+                context = currentParsedData.days[index].content;
+            } else {
+                context = currentParsedData[lastSelectedField];
+            }
 
             const refinePrompt = `
-                Act as a DepEd Master Teacher. I have this specific segment from a lesson plan in ${subject}:
+                Act as a DepEd Master Teacher crafting a student-centered instructional guide.
+                I have this specific segment from a lesson plan in ${subject}:
                 "${context}"
 
                 User Request: "${promptText}"
 
-                Please rewrite this segment to fulfill the request. Maintain the same professional tone.
-                RETURN ONLY THE UPDATED TEXT. USE HTML TAGS (<ul>, <li>, <b>, <p>, <br>) IF NECESSARY.
+                TONE RULE: Avoid administrative jargon. Speak as if you are directly guiding the teacher on how to talk to and engage the students. The language should be professional, immersive, and sophisticated.
+
+                LANGUAGE RULE: Maintain the same language (Filipino or English) as the current segment text provided above.
+
+                Please rewrite this segment to fulfill the request. RETURN ONLY THE UPDATED TEXT.
+                USE HTML TAGS (<ul>, <li>, <b>, <p>, <br>) IF NECESSARY.
                 NO MARKDOWN. NO JSON. JUST THE UPDATED CONTENT.
             `;
 
@@ -199,7 +220,13 @@
                 const data = await response.json();
                 if (response.ok) {
                     const newContent = data.candidates[0].content.parts[0].text.replace(/^```html\n?|```$/gm, '').trim();
-                    currentParsedData[lastSelectedField] = newContent;
+                    
+                    if (lastSelectedField.startsWith('day_')) {
+                        const index = parseInt(lastSelectedField.split('_')[1]);
+                        currentParsedData.days[index].content = newContent;
+                    } else {
+                        currentParsedData[lastSelectedField] = newContent;
+                    }
                     
                     // Re-render
                     const subject = document.getElementById('subject').value.trim();
@@ -225,7 +252,7 @@
 
         // Load saved values on startup
         window.onload = function() {
-            const fields = ['apiKey', 'subject', 'gradeLevel', 'contentStandard', 'performanceStandard', 'competency', 'modelSelect'];
+            const fields = ['apiKey', 'subject', 'gradeLevel', 'contentStandard', 'performanceStandard', 'competency', 'modelSelect', 'numDays'];
             fields.forEach(field => {
                 const savedValue = localStorage.getItem(field);
                 if (savedValue) {
@@ -244,6 +271,16 @@
         function renderTemplate(data, subject, gradeLevel, contentStandard, performanceStandard, competency) {
             const formattedCompetency = competency.split('\n').map(c => `<li>${c.trim()}</li>`).join('');
             
+            let daysHtml = '';
+            data.days.forEach((day, index) => {
+                daysHtml += `
+                    <div>
+                        <p class="font-bold underline text-[11px] mb-1 uppercase tracking-tight font-sans">DAY ${index + 1}: ${day.title}</p>
+                        <div class="text-justify field-editable" data-field="day_${index}">${day.content}</div>
+                    </div>
+                `;
+            });
+
             return `
                 <div class="border-2 border-gray-800 p-8 bg-white shadow-lg max-w-[210mm] mx-auto text-[11pt] leading-tight font-serif text-black">
                     <!-- Header -->
@@ -259,52 +296,52 @@
 
                     <table class="w-full border-collapse border border-gray-800 mb-6 font-sans">
                         <tr class="border-b border-gray-800">
-                            <td class="p-2 font-bold w-1/3 border-r border-gray-800 bg-gray-50 uppercase text-[10px]">Subject</td>
+                            <td class="p-2 font-bold w-1/3 border-r border-gray-800 bg-gray-50 uppercase text-[10px]">Subject (Asignatura)</td>
                             <td class="p-2 w-2/3 uppercase font-bold text-xs">${subject}</td>
                         </tr>
                         <tr class="border-b border-gray-800">
-                            <td class="p-2 font-bold border-r border-gray-800 bg-gray-50 uppercase text-[10px]">Grade Level</td>
+                            <td class="p-2 font-bold border-r border-gray-800 bg-gray-50 uppercase text-[10px]">Grade Level (Antas)</td>
                             <td class="p-2 text-xs">${gradeLevel}</td>
                         </tr>
                         <tr class="border-b border-gray-800">
-                            <td class="p-2 font-bold border-r border-gray-800 bg-gray-50 uppercase text-[10px]">Content Standard</td>
+                            <td class="p-2 font-bold border-r border-gray-800 bg-gray-50 uppercase text-[10px]">Content Standard (Pamantayang Pangnilalaman)</td>
                             <td class="p-2 italic text-xs font-serif">${contentStandard}</td>
                         </tr>
                         <tr class="border-b border-gray-800">
-                            <td class="p-2 font-bold border-r border-gray-800 bg-gray-50 uppercase text-[10px]">Performance Standard</td>
+                            <td class="p-2 font-bold border-r border-gray-800 bg-gray-50 uppercase text-[10px]">Performance Standard (Pamantayan sa Pagganap)</td>
                             <td class="p-2 italic text-xs font-serif">${performanceStandard}</td>
                         </tr>
                     </table>
 
                     <!-- I. INTENTIONS -->
-                    <div class="section-header font-sans">I. INTENTIONS</div>
+                    <div class="section-header font-sans">I. INTENTIONS (INTENSYON)</div>
                     <table class="w-full border-collapse border border-gray-800 mb-6">
                         <tr class="border-b border-gray-800">
-                            <td class="p-3 font-bold w-1/3 border-r border-gray-800 bg-gray-50 text-[11px] font-sans">i. Learning Competencies</td>
+                            <td class="p-3 font-bold w-1/3 border-r border-gray-800 bg-gray-50 text-[11px] font-sans">i. Learning Competencies (Mga Kasanayang Pampagkatuto)</td>
                             <td class="p-3 w-2/3 text-xs"><ul class="list-disc ml-4 space-y-1">${formattedCompetency}</ul></td>
                         </tr>
                         <tr>
-                            <td class="p-3 font-bold border-r border-gray-800 bg-gray-50 text-[11px] font-sans">ii. Learning Objectives</td>
+                            <td class="p-3 font-bold border-r border-gray-800 bg-gray-50 text-[11px] font-sans">ii. Learning Objectives (Mga Layunin sa Pagkatuto)</td>
                             <td class="p-3 text-xs text-justify field-editable" data-field="objectives">${data.objectives}</td>
                         </tr>
                     </table>
 
                     <!-- L. LEARNING EXPERIENCE -->
-                    <div class="section-header font-sans">L. LEARNING EXPERIENCE</div>
+                    <div class="section-header font-sans">L. LEARNING EXPERIENCE (KARANASAN SA PAGKATUTO)</div>
                     <table class="w-full border-collapse border border-gray-800 mb-6">
                         <tr class="border-b border-gray-800">
-                            <td class="p-3 font-bold w-1/3 border-r border-gray-800 bg-gray-50 text-[11px] font-sans">i. Learning resources</td>
+                            <td class="p-3 font-bold w-1/3 border-r border-gray-800 bg-gray-50 text-[11px] font-sans">i. Learning resources (Mga Kagamitan sa Pagkatuto)</td>
                             <td class="p-3 w-2/3 text-xs field-editable" data-field="resources">${data.resources}</td>
                         </tr>
                         <tr class="border-b border-gray-800">
-                            <td class="p-3 font-bold border-r border-gray-800 bg-gray-50 text-[11px] font-sans">ii. Pre-lesson activity</td>
+                            <td class="p-3 font-bold border-r border-gray-800 bg-gray-50 text-[11px] font-sans">ii. Pre-lesson activity (Gawain Bago ang Aralin)</td>
                             <td class="p-3 text-xs text-justify field-editable" data-field="pre_lesson">${data.pre_lesson}</td>
                         </tr>
                         <tr class="border-b border-gray-800">
                             <td class="p-3 font-bold border-r border-gray-800 bg-gray-50 text-[11px] font-sans flex flex-col justify-between min-h-[450px]">
-                                <div>iii. Lesson flow</div>
+                                <div>iii. Lesson flow (Daloy ng Aralin)</div>
                                 <div class="mt-8">
-                                    <p class="font-bold text-[10px] mb-2 uppercase border-b border-gray-200 pb-1">Flow Principles</p>
+                                    <p class="font-bold text-[10px] mb-2 uppercase border-b border-gray-200 pb-1">Flow Principles (Mga Prinsipyo ng Daloy)</p>
                                     <ul class="list-disc ml-4 space-y-2 text-[9px] italic font-normal leading-tight text-gray-600">
                                         <li>Make the objectives clear for all learners</li>
                                         <li>Guide learners before letting them try the task on their own</li>
@@ -318,41 +355,38 @@
                             </td>
                             <td class="p-3 text-xs">
                                 <div class="space-y-5">
-                                    <div><p class="font-bold underline text-[11px] mb-1 uppercase tracking-tight font-sans">DAY 1: ${data.day1_title}</p><div class="text-justify field-editable" data-field="day1_content">${data.day1_content}</div></div>
-                                    <div><p class="font-bold underline text-[11px] mb-1 uppercase tracking-tight font-sans">DAY 2: ${data.day2_title}</p><div class="text-justify field-editable" data-field="day2_content">${data.day2_content}</div></div>
-                                    <div><p class="font-bold underline text-[11px] mb-1 uppercase tracking-tight font-sans">DAY 3: ${data.day3_title}</p><div class="text-justify field-editable" data-field="day3_content">${data.day3_content}</div></div>
-                                    <div><p class="font-bold underline text-[11px] mb-1 uppercase tracking-tight font-sans">DAY 4: ${data.day4_title}</p><div class="text-justify field-editable" data-field="day4_content">${data.day4_content}</div></div>
+                                    ${daysHtml}
                                     <div class="mt-6 p-4 bg-gray-50 border border-dashed border-gray-400 rounded">
-                                        <p class="font-bold text-[10px] uppercase tracking-wider mb-2 font-sans">Let's Reflect On It!</p>
+                                        <p class="font-bold text-[10px] uppercase tracking-wider mb-2 font-sans">Let's Reflect On It! (Magnilay Tayo!)</p>
                                         <p class="italic text-[12px] leading-relaxed text-blue-900 font-serif field-editable" data-field="wrap_up">${data.wrap_up}</p>
                                     </div>
                                 </div>
                             </td>
                         </tr>
                         <tr>
-                            <td class="p-3 font-bold border-r border-gray-800 bg-gray-50 text-[11px] font-sans">iv. Opportunities for integration</td>
+                            <td class="p-3 font-bold border-r border-gray-800 bg-gray-50 text-[11px] font-sans">iv. Opportunities for integration (Mga Oportunidad para sa Integrasyon)</td>
                             <td class="p-3 text-xs text-justify field-editable" data-field="integration">${data.integration}</td>
                         </tr>
                     </table>
 
                     <!-- A. ASSESSING LEARNING -->
-                    <div class="section-header font-sans">A. ASSESSING LEARNING</div>
+                    <div class="section-header font-sans">A. ASSESSING LEARNING (PAGTATAYA SA PAGKATUTO)</div>
                     <table class="w-full border-collapse border border-gray-800 mb-6">
                         <tr>
-                            <td class="p-3 font-bold w-1/3 border-r border-gray-800 bg-gray-50 text-[11px] font-sans">i. Formative assessments</td>
+                            <td class="p-3 font-bold w-1/3 border-r border-gray-800 bg-gray-50 text-[11px] font-sans">i. Formative assessments (Mga Pormatibong Pagtataya)</td>
                             <td class="p-3 w-2/3 text-xs text-justify field-editable" data-field="assessment">${data.assessment}</td>
                         </tr>
                     </table>
 
                     <!-- W. WAYS FORWARD -->
-                    <div class="section-header font-sans">W. WAYS FORWARD</div>
+                    <div class="section-header font-sans">W. WAYS FORWARD (MGA HAKBANG PASULONG)</div>
                     <table class="w-full border-collapse border border-gray-800 font-sans">
                         <tr class="border-b border-gray-800">
-                            <td class="p-3 font-bold w-1/3 border-r border-gray-800 bg-gray-50 text-[11px]">i. Reflective practice</td>
+                            <td class="p-3 font-bold w-1/3 border-r border-gray-800 bg-gray-50 text-[11px]">i. Reflective practice (Replektibong Pagsasanay)</td>
                             <td class="p-3 w-2/3 text-xs text-justify font-serif field-editable" data-field="reflection">${data.reflection}</td>
                         </tr>
                         <tr>
-                            <td class="p-3 font-bold border-r border-gray-800 bg-gray-50 text-[11px]">ii. Extended learning opportunities</td>
+                            <td class="p-3 font-bold border-r border-gray-800 bg-gray-50 text-[11px]">ii. Extended learning opportunities (Mga Karagdagang Oportunidad sa Pagkatuto)</td>
                             <td class="p-3 text-xs text-justify font-serif field-editable" data-field="home_task">${data.home_task}</td>
                         </tr>
                     </table>
@@ -364,6 +398,7 @@
             const apiKey = document.getElementById('apiKey').value.trim();
             const subject = document.getElementById('subject').value.trim();
             const gradeLevel = document.getElementById('gradeLevel').value.trim();
+            const numDays = document.getElementById('numDays').value;
             const contentStandard = document.getElementById('contentStandard').value.trim();
             const performanceStandard = document.getElementById('performanceStandard').value.trim();
             const competency = document.getElementById('competency').value.trim();
@@ -382,28 +417,47 @@
             output.classList.add('hidden');
 
             const prompt = `
-                Act as a DepEd Master Teacher. Fill in the specific content for a 4-day Lesson Plan based on:
+                Act as a DepEd Master Teacher crafting a student-centered, immersive instructional guide.
+                Generate a ${numDays}-day Lesson Plan based on:
                 Subject: ${subject}
                 Competency: ${competency}
+                Content Standard: ${contentStandard}
+                Performance Standard: ${performanceStandard}
+
+                CORE INSTRUCTION: 
+                - Sound like a Facilitator's Script (directly addressing students or describing professional interaction).
+                - Ensure coherence: The ${numDays} days must form a logical "Instructional Arc".
+                - VARIETY IS KEY: Do NOT repeat the same routine every day. Use diverse strategies (Socratic Seminars, Gamified Challenges, Gallery Walks, Case Studies, etc.).
+
+                DAILY FLOW PRINCIPLES (Be creative and thematic with segment headers):
+                - For each session, create unique and appropriate headers for each segment of the flow (e.g., instead of "The Bridge", it could be "Pagtawid sa Bagong Kaalaman" or "Connecting the Dots").
+                - The headers should reflect the specific activity or pedagogical goal of that segment.
+                - Ensure the flow generally moves from an engaging start, through deep immersion/interaction, to a meaningful check for understanding and assessment.
+                - Use HTML <b> tags for these headers.
+
+                LANGUAGE RULE: Detect the language of the input. Use Filipino if the input is Filipino; otherwise, use English. IF FILIPINO, ENSURE ALL LABELS (like "The Bridge") ARE ALSO TRANSLATED TO FILIPINO.
 
                 RETURN A JSON OBJECT ONLY. NO MARKDOWN.
                 Structure:
                 {
-                    "objectives": "Detailed KSA objectives using HTML <ul><li>...</li></ul> formatting",
-                    "resources": "Formatting: <b>A. HAYO (High Activity):</b> [Detailed content]<br><br><b>B. HINAY (Remedial):</b> [Detailed content]",
-                    "pre_lesson": "Name of game, directions, and scoring mechanism...",
-                    "day1_title": "Unique thematic name", "day1_content": "Descriptive process...",
-                    "day2_title": "Unique thematic name", "day2_content": "Major task/directions...",
-                    "day3_title": "Unique thematic name", "day3_content": "Intervention/Tool used...",
-                    "day4_title": "Unique thematic name", "day4_content": "Peer collaboration...",
-                    "wrap_up": "Fill-in-the-blank reflection prompt (e.g., 'I used to think... but now...')",
-                    "integration": "Links to other subjects...",
-                    "assessment": "Specific look-fors and methods using HTML bullet points where applicable",
-                    "reflection": "Questions for the teacher...",
-                    "home_task": "Specific extension task..."
+                    "objectives": "Detailed KSA objectives using HTML <ul><li>...</li></ul>",
+                    "resources": "<b>A. HAYO:</b> [Materials]<br><b>B. HINAY:</b> [Scaffolding]",
+                    "pre_lesson": "Overall unit hook script.",
+                    "days": [
+                        {
+                            "title": "Creative/Thematic Title",
+                            "content": "A wordy, sophisticated script of the session flow. Use your creative headers for each segment (e.g., <b>[Creative Header]:</b> [Content])."
+                        }
+                        // Generate exactly ${numDays} days
+                    ],
+                    "wrap_up": "Closing thought script.",
+                    "integration": "Cross-disciplinary links.",
+                    "assessment": "Summary of indicators.",
+                    "reflection": "Teacher self-check.",
+                    "home_task": "Extension task."
                 }
 
-                Ensure content is WORDY and PROFESSIONAL. Avoid generic phrases. Focus on student agency and clarity. Use HTML tags (<ul>, <li>, <b>, <p>, <br>) INSIDE the JSON strings to provide clean formatting."
+                Ensure content is WORDY, SMART, and CLEANly typed. Use HTML tags (<ul>, <li>, <b>, <p>, <br>) inside JSON strings."
             `;
 
             const selectedModel = document.getElementById('modelSelect').value;
