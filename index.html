@@ -6,6 +6,11 @@
     <title>AI DLP Maker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="ai-core.js"></script>
+    <!-- DOCX Template Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.42.0/docxtemplater.js"></script>
+    <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip-utils.js"></script>
     <style>
         @media print {
             .no-print { display: none !important; }
@@ -379,7 +384,50 @@
             }
         }
 
-        function downloadDoc() {
+        async function downloadDoc() {
+            if (!currentParsedData) {
+                alert("Please generate a lesson plan first.");
+                return;
+            }
+
+            const content = document.getElementById('dlpContent').innerHTML;
+            
+            // Captures all CSS styles from the page to ensure the Word doc looks the same
+            let styles = "";
+            for (const sheet of document.styleSheets) {
+                try {
+                    for (const rule of sheet.cssRules) {
+                        styles += rule.cssText;
+                    }
+                } catch (e) { }
+            }
+
+            const header = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head><meta charset='utf-8'>
+                <style>
+                    ${styles}
+                    body { font-family: "Bookman Old Style", serif; font-size: 11pt; }
+                    .lesson-sheet { border: none !important; box-shadow: none !important; width: 100% !important; margin: 0 !important; }
+                    .field-editable:hover { background-color: transparent !important; }
+                    table { border-collapse: collapse; width: 100%; }
+                    td, th { border: 1px solid black; padding: 5px; }
+                </style>
+                </head><body>`;
+            
+            const footer = "</body></html>";
+            const sourceHTML = header + content + footer;
+
+            const out = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
+            const url = URL.createObjectURL(out);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `LessonPlan_${document.getElementById('subject').value.replace(/\s+/g, '_')}.doc`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function fallbackDownloadDoc() {
             const content = document.getElementById('dlpContent').innerHTML;
             const header = `
                 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -400,7 +448,7 @@
             const fileDownload = document.createElement("a");
             document.body.appendChild(fileDownload);
             fileDownload.href = source;
-            fileDownload.download = 'LessonPlan.doc';
+            fileDownload.download = 'LessonPlan_Fallback.doc';
             fileDownload.click();
             document.body.removeChild(fileDownload);
         }
