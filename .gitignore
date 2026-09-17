@@ -1,0 +1,12 @@
+.idea/
+.DS_Store
+assets/backups/
+assets/template_v4_extract/
+assets/template_v4_welded_extract/
+assets/lesson_plan_template_extract/
+assets/*.zip
+assets/lp_final_v4.docx
+assets/lp_final_v4_welded.docx
+assets/template_backup.docx
+assets/lesson_plan_template.docx
+read.py

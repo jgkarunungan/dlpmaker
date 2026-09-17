@@ -15,17 +15,15 @@
         @media print {
             .no-print { display: none !important; }
             body { background: white; padding: 0 !important; margin: 0 !important; }
-            .max-w-4xl { max-width: 100% !important; width: 100% !important; margin: 0 !important; }
+            .max-w-7xl { max-width: 100% !important; width: 100% !important; margin: 0 !important; }
             .content-area { box-shadow: none !important; border: none !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
             #outputContainer { padding: 0 !important; margin: 0 !important; }
             @page { size: A4; margin: 15mm; }
             
-            /* Smart Print Adjustments */
             .lesson-sheet { border: none !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; }
             .lesson-sheet table { width: 100% !important; }
             tr, .lesson-segment, .section-header { break-inside: avoid; page-break-inside: avoid; }
             
-            /* Ensure images load and are sized correctly in print */
             img { max-width: 80px !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         }
         .loading-dots:after {
@@ -38,144 +36,208 @@
             60% { content: '...'; }
             80%, 100% { content: ''; }
         }
-        /* Style for the generated DLP table to match the screenshots */
         .dlp-table th { background-color: #f3f4f6; text-align: left; padding: 12px; border: 1px solid #d1d5db; font-weight: 800; text-transform: uppercase; font-size: 0.75rem; tracking: 0.05em; }
         .dlp-table td { padding: 12px; border: 1px solid #d1d5db; vertical-align: top; }
         .section-header { background-color: #374151; color: white; padding: 8px 12px; font-weight: bold; text-transform: uppercase; margin-top: 20px; }
         
-        /* Editable area indicator */
         .field-editable:hover { background-color: #f0f7ff; cursor: text; transition: background 0.2s; }
         .field-editable::selection { background-color: #bfdbfe; }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        @media (max-width: 1023px) {
+            body { overflow: auto !important; }
+            .h-screen { height: auto !important; }
+        }
+
+        /* Custom Scrollbar for the preview area */
+        #outputContainer::-webkit-scrollbar { width: 6px; }
+        #outputContainer::-webkit-scrollbar-track { background: #f1f1f1; }
+        #outputContainer::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+        #outputContainer::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+<body class="bg-slate-50 min-h-screen text-slate-900 lg:overflow-hidden">
 
-    <div class="max-w-4xl mx-auto space-y-6">
-        <!-- Input Section -->
-        <div class="bg-white p-6 rounded-lg shadow-md no-print">
-            <h1 class="text-2xl font-bold mb-4 text-blue-600">AI Detailed Lesson Plan Maker</h1>
+    <div class="max-w-[1600px] mx-auto px-4 py-6 md:py-10 lg:h-screen flex flex-col">
+        <header class="mb-8 no-print px-2 flex-shrink-0">
+            <h1 class="text-3xl font-black text-blue-700 tracking-tight flex items-center gap-2">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                AI DLP MAKER
+            </h1>
+            <p class="text-slate-500 font-medium ml-1">Professional Detailed Lesson Plan Generator</p>
+        </header>
 
-            <div class="grid grid-cols-1 gap-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="apiKey" class="block text-sm font-medium text-gray-700">Gemini API Key</label>
-                        <input type="password" id="apiKey" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Enter your API Key">
+        <div class="grid grid-cols-1 lg:grid-cols-[minmax(400px,32%)_1fr] gap-8 items-start flex-grow min-h-0">
+            
+            <!-- LEFT COLUMN: LESSON SETUP -->
+            <aside class="space-y-6 no-print h-full lg:overflow-y-auto lg:pr-4 custom-scrollbar pb-10">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 px-5 py-3 border-b border-slate-200">
+                        <h2 class="font-bold text-slate-700 uppercase tracking-wider text-xs">Lesson Setup</h2>
                     </div>
-                    <div>
-                        <label for="modelSelect" class="block text-sm font-medium text-gray-700">AI Model</label>
-                        <select id="modelSelect" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            <option value="gemini-3.1-flash-lite" selected>Gemini 3.1 Flash-Lite (Speed/Lite)</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Detail)</option>
-                        </select>
+                    
+                    <div class="p-5 space-y-6">
+                        <!-- 01 BASIC INFORMATION -->
+                        <section class="space-y-3">
+                            <h3 class="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">01 Basic Information</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label for="subject" class="block text-xs font-bold text-slate-500 mb-1">Subject</label>
+                                    <input type="text" id="subject" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all outline-none" placeholder="e.g. Intro to Philosophy">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label for="gradeLevel" class="block text-xs font-bold text-slate-500 mb-1">Grade Level</label>
+                                        <input type="text" id="gradeLevel" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all outline-none" placeholder="e.g. 12">
+                                    </div>
+                                    <div>
+                                        <label for="numDays" class="block text-xs font-bold text-slate-500 mb-1">Sessions</label>
+                                        <select id="numDays" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all outline-none cursor-pointer">
+                                            <option value="1">1 Day</option>
+                                            <option value="2">2 Days</option>
+                                            <option value="3">3 Days</option>
+                                            <option value="4" selected>4 Days</option>
+                                            <option value="5">5 Days</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- 02 CURRICULUM INFORMATION -->
+                        <section class="space-y-3">
+                            <h3 class="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">02 Curriculum Information</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label for="contentStandard" class="block text-xs font-bold text-slate-500 mb-1">Content Standard</label>
+                                    <textarea id="contentStandard" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-y min-h-[60px] max-h-[400px]"></textarea>
+                                </div>
+                                <div>
+                                    <label for="performanceStandard" class="block text-xs font-bold text-slate-500 mb-1">Performance Standard</label>
+                                    <textarea id="performanceStandard" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-y min-h-[60px] max-h-[400px]"></textarea>
+                                </div>
+                                <div>
+                                    <label for="competency" class="block text-xs font-bold text-slate-500 mb-1">Learning Competencies</label>
+                                    <textarea id="competency" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-y min-h-[80px] max-h-[500px]" placeholder="Paste competencies with codes..."></textarea>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- 03 TEACHER INPUT -->
+                        <section class="space-y-3">
+                            <h3 class="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">03 Teacher Input</h3>
+                            <div>
+                                <label for="userSuggestions" class="block text-xs font-bold text-slate-500 mb-1">Suggestions (Optional)</label>
+                                <textarea id="userSuggestions" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all outline-none resize-y min-h-[80px] max-h-[500px]" placeholder="Add specific context or activities..."></textarea>
+                            </div>
+                        </section>
+
+                        <!-- 04 AI SETTINGS -->
+                        <section class="space-y-3 pb-2">
+                            <h3 class="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">04 AI Settings</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label for="apiKey" class="block text-xs font-bold text-slate-500 mb-1">Gemini API Key</label>
+                                    <input type="password" id="apiKey" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all outline-none" placeholder="Enter API Key">
+                                </div>
+                                <div>
+                                    <label for="modelSelect" class="block text-xs font-bold text-slate-500 mb-1">Model Selection</label>
+                                    <select id="modelSelect" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 ring-blue-500/20 focus:border-blue-500 transition-all outline-none cursor-pointer">
+                                        <option value="gemini-3.1-flash-lite" selected>Gemini 3.1 Flash-Lite</option>
+                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        <button onclick="generateDLP()" id="generateBtn" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 group">
+                            <span>GENERATE DLP</span>
+                            <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label for="subject" class="block text-sm font-medium text-gray-700">Subject</label>
-                        <input type="text" id="subject" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm" placeholder="e.g., Introduction to Philosophy">
+                <!-- History Section -->
+                <div id="historyContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden">
+                    <div class="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
+                        <h2 class="font-bold text-slate-700 uppercase tracking-wider text-xs">Recent Plans</h2>
+                        <button onclick="clearHistory()" class="text-[10px] font-bold text-red-500 hover:underline">CLEAR ALL</button>
                     </div>
-                    <div>
-                        <label for="gradeLevel" class="block text-sm font-medium text-gray-700">Grade Level</label>
-                        <input type="text" id="gradeLevel" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm" placeholder="e.g., 12">
-                    </div>
-                    <div>
-                        <label for="numDays" class="block text-sm font-medium text-gray-700">Number of Days</label>
-                        <select id="numDays" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            <option value="1">1 Day</option>
-                            <option value="2">2 Days</option>
-                            <option value="3">3 Days</option>
-                            <option value="4" selected>4 Days</option>
-                            <option value="5">5 Days</option>
-                        </select>
+                    <div id="historyList" class="p-4 space-y-2 max-h-[300px] overflow-y-auto">
+                        <!-- History items -->
                     </div>
                 </div>
 
-                <div>
-                    <label for="contentStandard" class="block text-sm font-medium text-gray-700">Content Standard</label>
-                    <textarea id="contentStandard" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm"></textarea>
+                <!-- System Log Console -->
+                <div id="logContainer" class="bg-slate-900 text-green-400 p-4 rounded-xl shadow-xl font-mono text-[10px] no-print overflow-hidden">
+                    <div class="flex justify-between items-center mb-2 border-b border-slate-800 pb-1">
+                        <span class="font-bold text-slate-500">SYSTEM LOG</span>
+                        <div class="flex gap-3">
+                            <button onclick="copyLogs()" class="hover:text-white transition">COPY</button>
+                            <button onclick="clearLogs()" class="hover:text-red-400 transition">CLEAR</button>
+                        </div>
+                    </div>
+                    <div id="logConsole" class="max-h-32 overflow-y-auto space-y-1 scrollbar-hide">
+                        <div>[SYSTEM] Ready...</div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- RIGHT COLUMN: GENERATED DLP -->
+            <main class="space-y-6 h-full lg:overflow-y-auto lg:pr-4 custom-scrollbar pb-10">
+                
+                <!-- Loading Indicator -->
+                <div id="loading" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-20 text-center">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-600 mb-4"></div>
+                    <p class="font-bold text-slate-700 text-lg loading-dots">AI is crafting your lesson plan</p>
+                    <p class="text-slate-500 text-sm mt-1">Applying curriculum standards and teacher context...</p>
                 </div>
 
-                <div>
-                    <label for="performanceStandard" class="block text-sm font-medium text-gray-700">Performance Standard</label>
-                    <textarea id="performanceStandard" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm"></textarea>
+                <!-- Output Section -->
+                <div id="outputContainer" class="hidden space-y-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div>
+                            <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Generated DLP</h2>
+                            <p class="text-[10px] text-blue-600 font-bold">PRO-TIP: Highlight text below to refine it with AI</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="copyToClipboard()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-all border border-slate-200">Copy Content</button>
+                            <button onclick="downloadDoc()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-blue-100 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                Download .docx
+                            </button>
+                            <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md shadow-emerald-100 transition-all">Print / PDF</button>
+                        </div>
+                    </div>
+
+                    <div id="dlpContent" class="bg-white rounded-sm shadow-2xl border border-slate-300 min-h-[1000px]">
+                        <!-- Content will be injected here -->
+                    </div>
                 </div>
 
-                <div>
-                    <label for="competency" class="block text-sm font-medium text-gray-700">Learning Competencies (with codes)</label>
-                    <textarea id="competency" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm" placeholder="Paste one or more competencies here...&#10;e.g.,&#10;1. PPT11/12-Ib-1.2...&#10;2. PPT11/12-Ic-2.1..."></textarea>
+                <!-- Empty State -->
+                <div id="emptyState" class="bg-white rounded-xl border-2 border-dashed border-slate-200 p-20 text-center">
+                    <div class="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-400 uppercase tracking-widest">No DLP Generated Yet</h3>
+                    <p class="text-slate-400 text-sm max-w-xs mx-auto mt-2">Complete the lesson setup on the left and click Generate to begin.</p>
                 </div>
-
-                <div>
-                    <label for="userSuggestions" class="block text-sm font-medium text-gray-700">Specific Details or Suggested Activities (Optional)</label>
-                    <textarea id="userSuggestions" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm" placeholder="e.g., 'Include a debate about AI', 'Focus on local examples from our province', or 'I want a role-play activity on day 2'"></textarea>
-                </div>
-
-                <div class="flex gap-2">
-                    <button onclick="generateDLP()" id="generateBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">
-                        Generate DLP
-                    </button>
-                </div>
-            </div>
+            </main>
         </div>
 
         <!-- Floating Refinement UI -->
         <div id="refinePopup" class="fixed z-50 bg-white shadow-2xl rounded-xl border border-blue-200 p-4 hidden w-80 no-print">
             <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Refine this segment</p>
-            <textarea id="refinePrompt" class="w-full text-xs p-2 border border-gray-200 rounded mb-2 outline-none focus:ring-2 ring-blue-500" rows="3" placeholder="e.g., 'Make this activity more group-oriented' or 'Simplify the language'"></textarea>
+            <textarea id="refinePrompt" class="w-full text-xs p-2 border border-slate-100 rounded-lg mb-2 outline-none focus:ring-2 ring-blue-500 bg-slate-50" rows="3" placeholder="e.g. 'Make this activity more group-oriented'"></textarea>
             <div class="flex justify-between items-center">
-                <button onclick="hideRefine()" class="text-[10px] font-bold text-gray-400 hover:text-gray-600">CANCEL</button>
-                <button id="refineBtn" onclick="applyRefinement()" class="bg-blue-600 text-white text-[10px] font-bold px-3 py-1.5 rounded hover:bg-blue-700 transition">APPLY CHANGES</button>
-            </div>
-        </div>
-
-        <!-- History Section -->
-        <div id="historyContainer" class="bg-white p-6 rounded-lg shadow-md no-print hidden">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-gray-700">Recent Lesson Plans</h2>
-                <button onclick="clearHistory()" class="text-xs text-red-500 hover:underline">Clear All</button>
-            </div>
-            <div id="historyList" class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2">
-                <!-- History items will be injected here -->
-            </div>
-        </div>
-
-        <!-- Output Section -->
-        <div id="outputContainer" class="hidden bg-white p-8 rounded-lg shadow-md content-area relative">
-            <div class="flex justify-between items-center mb-6 no-print">
-                <div class="flex items-center gap-4">
-                    <h2 class="text-xl font-bold">Generated Lesson Plan</h2>
-                    <span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-bold">PRO-TIP: Highlight text to refine it with AI</span>
-                </div>
-                <div class="flex gap-2">
-                    <button onclick="copyToClipboard()" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">Copy for Word</button>
-                    <button onclick="downloadDoc()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download .docx</button>
-                    <button onclick="window.print()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Print / Save PDF</button>
-                </div>
-            </div>
-
-            <div id="dlpContent" class="text-sm leading-relaxed text-gray-800">
-                <!-- Content will be injected here -->
-            </div>
-        </div>
-
-        <!-- Loading Indicator -->
-        <div id="loading" class="hidden text-center p-10">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p class="mt-2 font-medium loading-dots">AI is crafting your lesson plan</p>
-        </div>
-
-        <!-- System Log Console -->
-        <div id="logContainer" class="bg-gray-900 text-green-400 p-4 rounded-lg shadow-xl font-mono text-xs mt-6 no-print overflow-hidden">
-            <div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-1">
-                <span class="font-bold text-gray-400">SYSTEM ACTIVITY LOG</span>
-                <div class="flex gap-3">
-                    <button onclick="copyLogs()" class="hover:text-white transition">COPY LOGS</button>
-                    <button onclick="clearLogs()" class="hover:text-red-400 transition">CLEAR</button>
-                </div>
-            </div>
-            <div id="logConsole" class="max-h-40 overflow-y-auto space-y-1">
-                <div>[SYSTEM] Console initialized. Standing by...</div>
+                <button onclick="hideRefine()" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 tracking-tighter">CANCEL</button>
+                <button id="refineBtn" onclick="applyRefinement()" class="bg-blue-600 text-white text-[10px] font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition-all">APPLY CHANGES</button>
             </div>
         </div>
     </div>
@@ -295,12 +357,12 @@
             if (history.length === 0) { container.classList.add('hidden'); return; }
             container.classList.remove('hidden');
             list.innerHTML = history.map(item => `
-                <div onclick="loadFromHistory(${item.id})" class="cursor-pointer border ${item.id === currentHistoryId ? 'border-blue-500 bg-blue-50' : 'border-gray-200'} p-3 rounded hover:bg-blue-50 transition flex justify-between items-center group">
+                <div onclick="loadFromHistory(${item.id})" class="cursor-pointer border ${item.id === currentHistoryId ? 'border-blue-500 bg-blue-50' : 'border-slate-100'} p-3 rounded-lg hover:bg-blue-50 transition-all flex justify-between items-center group">
                     <div>
-                        <p class="font-bold text-sm text-blue-600">${item.subject || 'Untitled'}</p>
-                        <p class="text-[10px] text-gray-500">${item.timestamp} • Grade ${item.gradeLevel}</p>
+                        <p class="font-bold text-xs text-slate-700 group-hover:text-blue-600 transition-colors">${item.subject || 'Untitled'}</p>
+                        <p class="text-[9px] text-slate-400 font-medium">${item.timestamp} • Grade ${item.gradeLevel}</p>
                     </div>
-                    <button onclick="deleteHistoryItem(event, ${item.id})" class="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
+                    <button onclick="deleteHistoryItem(event, ${item.id})" class="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
@@ -320,6 +382,7 @@
             document.getElementById('userSuggestions').value = item.userSuggestions || '';
             document.getElementById('dlpContent').innerHTML = renderTemplate(currentParsedData, item.subject, item.gradeLevel, item.contentStandard || '', item.performanceStandard || '', item.competency, item.teacherName || "Jhunrie G. Bayog");
             document.getElementById('outputContainer').classList.remove('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
             localStorage.setItem('last_dlp_id', id);
             renderHistoryList();
         }
@@ -735,9 +798,13 @@
             const btn = document.getElementById('generateBtn');
             const loading = document.getElementById('loading');
             const output = document.getElementById('outputContainer');
+            const emptyState = document.getElementById('emptyState');
+            
             btn.disabled = true;
             loading.classList.remove('hidden');
             output.classList.add('hidden');
+            if (emptyState) emptyState.classList.add('hidden');
+            
             try {
                 const result = await callGenerateDLP(inputs);
                 log("AI response received.", "info");
@@ -745,7 +812,14 @@
                 saveToHistory(currentParsedData, inputs);
                 document.getElementById('dlpContent').innerHTML = renderTemplate(currentParsedData, inputs.subject, inputs.gradeLevel, inputs.contentStandard, inputs.performanceStandard, inputs.competency);
                 output.classList.remove('hidden');
-            } catch (error) { log(`API Error: ${error.message}`, "error"); alert('API Error: ' + error.message); } finally { btn.disabled = false; loading.classList.add('hidden'); }
+            } catch (error) { 
+                log(`API Error: ${error.message}`, "error"); 
+                alert('API Error: ' + error.message); 
+                if (emptyState) emptyState.classList.remove('hidden');
+            } finally { 
+                btn.disabled = false; 
+                loading.classList.add('hidden'); 
+            }
         }
     </script>
 </body>
