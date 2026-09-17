@@ -111,9 +111,11 @@
                     <textarea id="userSuggestions" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm" placeholder="e.g., 'Include a debate about AI', 'Focus on local examples from our province', or 'I want a role-play activity on day 2'"></textarea>
                 </div>
 
-                <button onclick="generateDLP()" id="generateBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">
-                    Generate DLP
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="generateDLP()" id="generateBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">
+                        Generate DLP
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -146,7 +148,8 @@
                     <span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-bold">PRO-TIP: Highlight text to refine it with AI</span>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="downloadDoc()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download for Word (.doc)</button>
+                    <button onclick="copyToClipboard()" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">Copy for Word</button>
+                    <button onclick="downloadDoc()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download .docx</button>
                     <button onclick="window.print()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Print / Save PDF</button>
                 </div>
             </div>
@@ -161,6 +164,20 @@
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p class="mt-2 font-medium loading-dots">AI is crafting your lesson plan</p>
         </div>
+
+        <!-- System Log Console -->
+        <div id="logContainer" class="bg-gray-900 text-green-400 p-4 rounded-lg shadow-xl font-mono text-xs mt-6 no-print overflow-hidden">
+            <div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-1">
+                <span class="font-bold text-gray-400">SYSTEM ACTIVITY LOG</span>
+                <div class="flex gap-3">
+                    <button onclick="copyLogs()" class="hover:text-white transition">COPY LOGS</button>
+                    <button onclick="clearLogs()" class="hover:text-red-400 transition">CLEAR</button>
+                </div>
+            </div>
+            <div id="logConsole" class="max-h-40 overflow-y-auto space-y-1">
+                <div>[SYSTEM] Console initialized. Standing by...</div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -169,13 +186,65 @@
         let currentHistoryId = null;
         let history = JSON.parse(localStorage.getItem('dlp_history') || '[]');
 
+        // Constants and Field Mappings
+        const FRESH_TEMPLATE_MAP = {
+            table1: {
+                lessonTitle: { row: 0, cell: 1 },
+                subject: { row: 1, cell: 1 },
+                teacherName: { row: 2, cell: 1 },
+                gradeLevel: { row: 3, cell: 1 },
+                sessions: { row: 4, cell: 1 },
+                references: { row: 5, cell: 1 },
+                aiDeclaration: { row: 6, cell: 1 },
+                competency: { row: 8, cell: 1 },
+                knowledge: { row: 9, cell: 1 },
+                skills: { row: 10, cell: 1 },
+                behavior: { row: 11, cell: 1 },
+                learnerContext: { row: 12, cell: 1 },
+                resources: { row: 14, cell: 1 },
+                preLesson: { row: 15, cell: 1 },
+                flow: { row: 16, cell: 1 },
+                integration: { row: 17, cell: 1 },
+                assessment: { row: 19, cell: 1 },
+                extendedLearning: { row: 21, cell: 1 },
+                reflection: { row: 22, cell: 1 }
+            }
+        };
+
+        // Logging Utility
+        function log(message, type = 'info') {
+            const consoleEl = document.getElementById('logConsole');
+            if (!consoleEl) return;
+            const entry = document.createElement('div');
+            const timestamp = new Date().toLocaleTimeString();
+            let color = 'text-green-400';
+            if (type === 'error') color = 'text-red-400';
+            if (type === 'warn') color = 'text-yellow-400';
+            if (type === 'system') color = 'text-blue-400';
+
+            entry.className = color;
+            entry.innerHTML = `<span>[${timestamp}]</span> [${type.toUpperCase()}] ${message}`;
+            consoleEl.appendChild(entry);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLogs() {
+            document.getElementById('logConsole').innerHTML = '<div>[SYSTEM] Logs cleared.</div>';
+        }
+
+        async function copyLogs() {
+            const text = document.getElementById('logConsole').innerText;
+            await navigator.clipboard.writeText(text);
+            alert("Logs copied to clipboard!");
+        }
+
         // Sync manual edits back to data object and persistence
         document.getElementById('dlpContent').addEventListener('input', function(e) {
             const field = e.target.getAttribute('data-field');
             if (field && currentParsedData && currentHistoryId) {
                 const newValue = e.target.innerHTML;
                 
-                // Update local data object
                 if (field.startsWith('day_')) {
                     const index = parseInt(field.split('_')[1]);
                     currentParsedData.days[index].content = newValue;
@@ -186,17 +255,14 @@
                     currentParsedData[field] = newValue;
                 }
 
-                // Update the actual item in history
                 const item = history.find(h => h.id === currentHistoryId);
                 if (item) {
                     item.data = currentParsedData;
-                    // Also update top-level fields for history list/restore
                     if (field === 'subject') item.subject = e.target.innerText;
                     if (field === 'gradeLevel') item.gradeLevel = e.target.innerText;
                     if (field === 'teacherName') item.teacherName = e.target.innerText;
 
                     localStorage.setItem('dlp_history', JSON.stringify(history));
-                    localStorage.setItem('last_dlp_id', currentHistoryId); // Remember this one
                     renderHistoryList();
                 }
             }
@@ -208,7 +274,7 @@
                 timestamp: new Date().toLocaleString(),
                 subject: inputs.subject,
                 gradeLevel: inputs.gradeLevel,
-                teacherName: "Jhunrie G. Bayog", // Default
+                teacherName: "Jhunrie G. Bayog",
                 contentStandard: inputs.contentStandard,
                 performanceStandard: inputs.performanceStandard,
                 competency: inputs.competency,
@@ -219,19 +285,14 @@
             history.unshift(newItem);
             if (history.length > 15) history.pop();
             localStorage.setItem('dlp_history', JSON.stringify(history));
-            localStorage.setItem('last_dlp_id', newItem.id); // Save as last active
+            localStorage.setItem('last_dlp_id', newItem.id);
             renderHistoryList();
         }
 
         function renderHistoryList() {
             const container = document.getElementById('historyContainer');
             const list = document.getElementById('historyList');
-            
-            if (history.length === 0) {
-                container.classList.add('hidden');
-                return;
-            }
-            
+            if (history.length === 0) { container.classList.add('hidden'); return; }
             container.classList.remove('hidden');
             list.innerHTML = history.map(item => `
                 <div onclick="loadFromHistory(${item.id})" class="cursor-pointer border ${item.id === currentHistoryId ? 'border-blue-500 bg-blue-50' : 'border-gray-200'} p-3 rounded hover:bg-blue-50 transition flex justify-between items-center group">
@@ -249,29 +310,18 @@
         function loadFromHistory(id) {
             const item = history.find(h => h.id === id);
             if (!item) return;
-
             currentParsedData = item.data;
             currentHistoryId = id;
-            
-            // Restore inputs
             document.getElementById('subject').value = item.subject;
             document.getElementById('gradeLevel').value = item.gradeLevel;
             document.getElementById('contentStandard').value = item.contentStandard || '';
             document.getElementById('performanceStandard').value = item.performanceStandard || '';
             document.getElementById('competency').value = item.competency;
             document.getElementById('userSuggestions').value = item.userSuggestions || '';
-
-            // Render Output
-            document.getElementById('dlpContent').innerHTML = renderTemplate(
-                currentParsedData, item.subject, item.gradeLevel,
-                item.contentStandard || '', item.performanceStandard || '', item.competency,
-                item.teacherName || "Jhunrie G. Bayog"
-            );
-            
+            document.getElementById('dlpContent').innerHTML = renderTemplate(currentParsedData, item.subject, item.gradeLevel, item.contentStandard || '', item.performanceStandard || '', item.competency, item.teacherName || "Jhunrie G. Bayog");
             document.getElementById('outputContainer').classList.remove('hidden');
-            document.getElementById('outputContainer').scrollIntoView({ behavior: 'smooth' });
-            localStorage.setItem('last_dlp_id', id); // Remember this is now the active one
-            renderHistoryList(); // Update highlight
+            localStorage.setItem('last_dlp_id', id);
+            renderHistoryList();
         }
 
         function deleteHistoryItem(e, id) {
@@ -289,35 +339,24 @@
             }
         }
 
-        // Selection Listener for Refinement
         document.addEventListener('mouseup', function(e) {
             const selection = window.getSelection();
             const text = selection.toString().trim();
-            
             if (text && text.length > 3) {
-                // Find if the selection is inside a field-editable element
                 let target = selection.anchorNode;
                 if (target.nodeType === 3) target = target.parentElement;
-                
                 const editableParent = target.closest('.field-editable');
-
                 if (editableParent) {
                     lastSelectedField = editableParent.getAttribute('data-field');
                     const popup = document.getElementById('refinePopup');
-                    
-                    // Position popup near the mouse cursor using clientX/Y (viewport relative)
-                    // since the popup is "fixed"
                     const x = Math.min(e.clientX, window.innerWidth - 350);
                     const y = Math.min(e.clientY + 20, window.innerHeight - 200);
-                    
                     popup.style.left = `${x}px`;
                     popup.style.top = `${y}px`;
                     popup.classList.remove('hidden');
                 }
-            } else {
-                if (!e.target.closest('#refinePopup')) {
-                    hideRefine();
-                }
+            } else if (!e.target.closest('#refinePopup')) {
+                hideRefine();
             }
         });
 
@@ -331,157 +370,227 @@
             const promptText = document.getElementById('refinePrompt').value.trim();
             const btn = document.getElementById('refineBtn');
             const selectedModel = document.getElementById('modelSelect').value;
-            
             if (!promptText || !lastSelectedField || !currentParsedData) return;
-
             btn.disabled = true;
             btn.innerText = "REFINING...";
-
             const subject = document.getElementById('subject').value;
-            let context = '';
-            if (lastSelectedField.startsWith('day_')) {
-                const index = parseInt(lastSelectedField.split('_')[1]);
-                context = currentParsedData.days[index].content;
-            } else {
-                context = currentParsedData[lastSelectedField];
-            }
-
+            let context = lastSelectedField.startsWith('day_') ? currentParsedData.days[parseInt(lastSelectedField.split('_')[1])].content : currentParsedData[lastSelectedField];
             try {
-                const newContent = await callRefineSegment({
-                    apiKey, subject, promptText, context, selectedModel
-                });
-
+                const newContent = await callRefineSegment({ apiKey, subject, promptText, context, selectedModel });
                 if (newContent) {
                     if (lastSelectedField.startsWith('day_')) {
-                        const index = parseInt(lastSelectedField.split('_')[1]);
-                        currentParsedData.days[index].content = newContent;
+                        currentParsedData.days[parseInt(lastSelectedField.split('_')[1])].content = newContent;
                     } else {
                         currentParsedData[lastSelectedField] = newContent;
                     }
-
-                    // Update history and save
-                    const historyItem = history.find(h => h.id === currentHistoryId);
-                    if (historyItem) {
-                        historyItem.data = currentParsedData;
-                        localStorage.setItem('dlp_history', JSON.stringify(history));
-                    }
-                    
-                    document.getElementById('dlpContent').innerHTML = renderTemplate(
-                        currentParsedData, subject, 
-                        document.getElementById('gradeLevel').value,
-                        document.getElementById('contentStandard').value,
-                        document.getElementById('performanceStandard').value,
-                        document.getElementById('competency').value,
-                        historyItem ? historyItem.teacherName : "Jhunrie G. Bayog"
-                    );
+                    const item = history.find(h => h.id === currentHistoryId);
+                    if (item) { item.data = currentParsedData; localStorage.setItem('dlp_history', JSON.stringify(history)); }
+                    document.getElementById('dlpContent').innerHTML = renderTemplate(currentParsedData, subject, document.getElementById('gradeLevel').value, document.getElementById('contentStandard').value, document.getElementById('performanceStandard').value, document.getElementById('competency').value, item ? item.teacherName : "Jhunrie G. Bayog");
                     hideRefine();
                 }
-            } catch (e) {
-                alert('Refinement Error: ' + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "APPLY CHANGES";
+            } catch (e) { alert('Refinement Error: ' + e.message); } finally { btn.disabled = false; btn.innerText = "APPLY CHANGES"; }
+        }
+
+        async function copyToClipboard() {
+            if (!currentParsedData) return;
+            const content = document.getElementById('dlpContent').innerHTML;
+            const blob = new Blob([`<div style="font-family: 'Bookman Old Style', serif;">${content}</div>`], { type: 'text/html' });
+            const data = [new ClipboardItem({ 'text/html': blob })];
+            try { await navigator.clipboard.write(data); alert("Copied!"); } catch (err) { alert("Copy failed."); }
+        }
+
+        // --- PRODUCTION DOCX EXPORT SYSTEM ---
+
+        function cleanForPlainTextExport(value) {
+            if (value === null || value === undefined) return "";
+            let text = String(value);
+            text = text.replace(/\\<br>/g, "\n").replace(/\\n/g, "\n");
+            text = text.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n").replace(/<li>/gi, "\n- ").replace(/<\/li>/gi, "").replace(/<ul>|<\/ul>|<ol>|<\/ol>/gi, "");
+            text = text.replace(/<[^>]+>/g, "");
+            const entities = { '&nbsp;': ' ', '&#x20;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&#x27;': "'", '&#34;': '"', '&#60;': '<', '&#62;': '>' };
+            for (let key in entities) { text = text.replace(new RegExp(key, 'g'), entities[key]); }
+            text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec)).replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+            text = text.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/__([^_]+)__/g, "$1").replace(/^#+\s+/gm, "").replace(/^\|?\s*[:\-|\s]+\|?\s*$/gm, "");
+            return text.replace(/\n\s*\n\s*\n+/g, "\n\n").trim();
+        }
+
+        function writePlainTextToCell(xmlDoc, cell, text, wNS) {
+            if (!cell) return;
+            const tcPr = cell.getElementsByTagNameNS(wNS, 'tcPr')[0];
+            const firstP = cell.getElementsByTagNameNS(wNS, 'p')[0];
+            let pPr = firstP ? firstP.getElementsByTagNameNS(wNS, 'pPr')[0] : null;
+            let rPr = null;
+            if (firstP) {
+                const firstR = firstP.getElementsByTagNameNS(wNS, 'r')[0];
+                if (firstR) rPr = firstR.getElementsByTagNameNS(wNS, 'rPr')[0];
             }
+            Array.from(cell.childNodes).forEach(child => { if (child.localName !== 'tcPr') cell.removeChild(child); });
+            text.split('\n').forEach(line => {
+                const p = xmlDoc.createElementNS(wNS, 'w:p');
+                if (pPr) p.appendChild(pPr.cloneNode(true));
+                const r = xmlDoc.createElementNS(wNS, 'w:r');
+                const currentRPr = rPr ? rPr.cloneNode(true) : xmlDoc.createElementNS(wNS, 'w:rPr');
+                let rFonts = currentRPr.getElementsByTagNameNS(wNS, 'rFonts')[0];
+                if (!rFonts) { rFonts = xmlDoc.createElementNS(wNS, 'w:rFonts'); currentRPr.appendChild(rFonts); }
+                rFonts.setAttributeNS(wNS, 'w:ascii', 'Bookman Old Style');
+                rFonts.setAttributeNS(wNS, 'w:hAnsi', 'Bookman Old Style');
+                rFonts.setAttributeNS(wNS, 'w:eastAsia', 'Bookman Old Style');
+                rFonts.setAttributeNS(wNS, 'w:cs', 'Bookman Old Style');
+                r.appendChild(currentRPr);
+                const t = xmlDoc.createElementNS(wNS, 'w:t');
+                t.setAttribute('xml:space', 'preserve');
+                t.textContent = line;
+                r.appendChild(t);
+                p.appendChild(r);
+                cell.appendChild(p);
+            });
+        }
+
+        function appendPlainTextToCellAfterLabel(xmlDoc, tableNode, rIdx, cIdx, label, text, wNS) {
+            const row = tableNode.getElementsByTagNameNS(wNS, 'tr')[rIdx];
+            if (!row) return;
+            const cells = Array.from(row.childNodes).filter(n => n.nodeName === 'w:tc' || n.localName === 'tc');
+            const cell = cells[cIdx];
+            if (!cell) return;
+            const ps = Array.from(cell.getElementsByTagNameNS(wNS, 'p'));
+            let targetP = ps.find(p => p.textContent.includes(label)) || ps[ps.length - 1];
+            if (!targetP) { writePlainTextToCell(xmlDoc, cell, text, wNS); return; }
+            const pPr = targetP.getElementsByTagNameNS(wNS, 'pPr')[0];
+            const rPr = targetP.getElementsByTagNameNS(wNS, 'rPr')[0] || (targetP.getElementsByTagNameNS(wNS, 'r')[0]?.getElementsByTagNameNS(wNS, 'rPr')[0]);
+            let lastInserted = targetP;
+            text.split('\n').forEach(line => {
+                if (!line.trim()) return;
+                const p = xmlDoc.createElementNS(wNS, 'w:p');
+                if (pPr) p.appendChild(pPr.cloneNode(true));
+                const r = xmlDoc.createElementNS(wNS, 'w:r');
+                const currentRPr = rPr ? rPr.cloneNode(true) : xmlDoc.createElementNS(wNS, 'w:rPr');
+                let rFonts = currentRPr.getElementsByTagNameNS(wNS, 'rFonts')[0];
+                if (!rFonts) { rFonts = xmlDoc.createElementNS(wNS, 'w:rFonts'); currentRPr.appendChild(rFonts); }
+                rFonts.setAttributeNS(wNS, 'w:ascii', 'Bookman Old Style');
+                rFonts.setAttributeNS(wNS, 'w:hAnsi', 'Bookman Old Style');
+                rFonts.setAttributeNS(wNS, 'w:eastAsia', 'Bookman Old Style');
+                rFonts.setAttributeNS(wNS, 'w:cs', 'Bookman Old Style');
+                r.appendChild(currentRPr);
+                const t = xmlDoc.createElementNS(wNS, 'w:t');
+                t.setAttribute('xml:space', 'preserve');
+                t.textContent = line;
+                r.appendChild(t);
+                p.appendChild(r);
+                cell.insertBefore(p, lastInserted.nextSibling);
+                lastInserted = p;
+            });
+        }
+
+        function getCell(table, r, c, wNS) {
+            const rows = table.getElementsByTagNameNS(wNS, 'tr');
+            if (!rows[r]) return null;
+            const cells = Array.from(rows[r].childNodes).filter(n => n.nodeName === 'w:tc' || n.localName === 'tc');
+            return cells[c];
         }
 
         async function downloadDoc() {
-            if (!currentParsedData) {
-                alert("Please generate a lesson plan first.");
-                return;
-            }
+            if (!currentParsedData) { alert("Please generate a lesson plan first."); return; }
+            log("Starting production DOCX export...", "system");
+            try {
+                const response = await fetch('./assets/fresh-template.docx');
+                if (!response.ok) throw new Error("Template file not found.");
+                const buffer = await response.arrayBuffer();
+                const zip = new PizZip(buffer);
+                const docPath = 'word/document.xml';
+                const xmlString = zip.file(docPath).asText();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlString, "application/xml");
+                const wNS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+                const tables = xmlDoc.getElementsByTagNameNS(wNS, 'tbl');
+                const table1 = tables[0];
+                const fields = FRESH_TEMPLATE_MAP.table1;
 
-            const content = document.getElementById('dlpContent').innerHTML;
-            
-            // Captures all CSS styles from the page to ensure the Word doc looks the same
-            let styles = "";
-            for (const sheet of document.styleSheets) {
-                try {
-                    for (const rule of sheet.cssRules) {
-                        styles += rule.cssText;
-                    }
-                } catch (e) { }
-            }
+                const getClean = (val) => cleanForPlainTextExport(val);
+                const inputs = { subject: document.getElementById('subject').value, gradeLevel: document.getElementById('gradeLevel').value, competency: document.getElementById('competency').value };
 
-            const header = `
-                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-                <head><meta charset='utf-8'>
-                <style>
-                    ${styles}
-                    body { font-family: "Bookman Old Style", serif; font-size: 11pt; }
-                    .lesson-sheet { border: none !important; box-shadow: none !important; width: 100% !important; margin: 0 !important; }
-                    .field-editable:hover { background-color: transparent !important; }
-                    table { border-collapse: collapse; width: 100%; }
-                    td, th { border: 1px solid black; padding: 5px; }
-                </style>
-                </head><body>`;
-            
-            const footer = "</body></html>";
-            const sourceHTML = header + content + footer;
+                const dataToExport = {
+                    lessonTitle: getClean(currentParsedData.subject || inputs.subject),
+                    subject: getClean(currentParsedData.subject || inputs.subject),
+                    teacherName: getClean(currentParsedData.teacherName || "Jhunrie G. Bayog"),
+                    gradeLevel: getClean(currentParsedData.gradeLevel || inputs.gradeLevel),
+                    sessions: String(currentParsedData.days?.length || 0),
+                    references: getClean(currentParsedData.references),
+                    aiDeclaration: getClean(currentParsedData.ai_declaration),
+                    competency: getClean(inputs.competency),
+                    knowledge: getClean(currentParsedData.objectives?.knowledge),
+                    skills: getClean(currentParsedData.objectives?.skills),
+                    behavior: getClean(currentParsedData.objectives?.behavior),
+                    learner_context: getClean(currentParsedData.learner_context),
+                    pre_lesson: getClean(currentParsedData.pre_lesson),
+                    integration: getClean(currentParsedData.integration),
+                    assessment: getClean(currentParsedData.assessment),
+                    home_task: getClean(currentParsedData.home_task),
+                    reflection: getClean(currentParsedData.reflection),
+                };
 
-            const out = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
-            const url = URL.createObjectURL(out);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `LessonPlan_${document.getElementById('subject').value.replace(/\s+/g, '_')}.doc`;
-            link.click();
-            URL.revokeObjectURL(url);
-        }
+                let flowText = "";
+                currentParsedData.days.forEach((day, i) => { flowText += `DAY ${i + 1}: ${day.title}\n${day.content}\n\n`; });
+                flowText += `Let's Reflect On It! (Magnilay Tayo!)\n${currentParsedData.wrap_up || ""}`;
+                dataToExport.flow = getClean(flowText);
 
-        function fallbackDownloadDoc() {
-            const content = document.getElementById('dlpContent').innerHTML;
-            const header = `
-                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-                <head><meta charset='utf-8'><title>Lesson Plan</title>
-                <style>
-                    body { font-family: "Bookman Old Style", serif; font-size: 11pt; }
-                    table { border-collapse: collapse; width: 100%; }
-                    td, th { border: 1px solid black; padding: 5px; vertical-align: top; }
-                    .section-header { background-color: #BFBFBF; font-weight: bold; text-align: center; }
-                    .dashed-border { border-right: 1px dashed black !important; }
-                    ul { margin-left: 20px; }
-                </style>
-                </head><body>`;
-            const footer = "</body></html>";
-            const sourceHTML = header + content + footer;
+                // Populate fields
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.lessonTitle.row, fields.lessonTitle.cell, wNS), dataToExport.lessonTitle, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.subject.row, fields.subject.cell, wNS), dataToExport.subject, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.teacherName.row, fields.teacherName.cell, wNS), dataToExport.teacherName, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.gradeLevel.row, fields.gradeLevel.cell, wNS), dataToExport.gradeLevel, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.sessions.row, fields.sessions.cell, wNS), dataToExport.sessions, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.references.row, fields.references.cell, wNS), dataToExport.references, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.aiDeclaration.row, fields.aiDeclaration.cell, wNS), dataToExport.aiDeclaration, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.competency.row, fields.competency.cell, wNS), dataToExport.competency, wNS);
+                
+                appendPlainTextToCellAfterLabel(xmlDoc, table1, fields.knowledge.row, fields.knowledge.cell, "Knowledge:", dataToExport.knowledge, wNS);
+                appendPlainTextToCellAfterLabel(xmlDoc, table1, fields.skills.row, fields.skills.cell, "Skills:", dataToExport.skills, wNS);
+                appendPlainTextToCellAfterLabel(xmlDoc, table1, fields.behavior.row, fields.behavior.cell, "Behavior:", dataToExport.behavior, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.learnerContext.row, fields.learnerContext.cell, wNS), dataToExport.learner_context, wNS);
 
-            const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
-            const fileDownload = document.createElement("a");
-            document.body.appendChild(fileDownload);
-            fileDownload.href = source;
-            fileDownload.download = 'LessonPlan_Fallback.doc';
-            fileDownload.click();
-            document.body.removeChild(fileDownload);
+                let resourcesHayo = "", resourcesHinay = "";
+                if (currentParsedData.resources?.includes("HINAY:")) {
+                    const rParts = currentParsedData.resources.split(/HINAY:/i);
+                    resourcesHayo = getClean(rParts[0].replace(/HAYO:/i, ""));
+                    resourcesHinay = getClean(rParts[1]);
+                } else { resourcesHayo = getClean(currentParsedData.resources); }
+                appendPlainTextToCellAfterLabel(xmlDoc, table1, fields.resources.row, fields.resources.cell, "HAYO:", resourcesHayo, wNS);
+                appendPlainTextToCellAfterLabel(xmlDoc, table1, fields.resources.row, fields.resources.cell, "HINAY:", resourcesHinay, wNS);
+
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.preLesson.row, fields.preLesson.cell, wNS), dataToExport.pre_lesson, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.flow.row, fields.flow.cell, wNS), dataToExport.flow, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.integration.row, fields.integration.cell, wNS), dataToExport.integration, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.assessment.row, fields.assessment.cell, wNS), dataToExport.assessment, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.extendedLearning.row, fields.extendedLearning.cell, wNS), dataToExport.home_task, wNS);
+                writePlainTextToCell(xmlDoc, getCell(table1, fields.reflection.row, fields.reflection.cell, wNS), dataToExport.reflection, wNS);
+
+                const serializer = new XMLSerializer();
+                zip.file(docPath, serializer.serializeToString(xmlDoc));
+                const out = zip.generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+                saveAs(out, `LessonPlan_${dataToExport.subject.replace(/\s+/g, '_')}.docx`);
+                
+                log("[PRODUCTION DOCX EXPORT] SUCCESS", "system");
+            } catch (e) { log("Export Error: " + e.message, "error"); alert("Export failed: " + e.message); }
         }
 
         // Load saved values on startup
         window.onload = function() {
             renderHistoryList();
-            const fields = ['apiKey', 'subject', 'gradeLevel', 'contentStandard', 'performanceStandard', 'competency', 'userSuggestions', 'modelSelect', 'numDays'];
-
-            fields.forEach(field => {
-                const savedValue = localStorage.getItem(field);
-                if (savedValue) {
-                    const el = document.getElementById(field);
-                    if (el) el.value = savedValue;
-                }
-                
+            ['apiKey', 'subject', 'gradeLevel', 'contentStandard', 'performanceStandard', 'competency', 'userSuggestions', 'modelSelect', 'numDays'].forEach(field => {
+                const saved = localStorage.getItem(field);
+                if (saved) { const el = document.getElementById(field); if (el) el.value = saved; }
                 const el = document.getElementById(field);
                 if (el) {
                     el.addEventListener('input', (e) => localStorage.setItem(field, e.target.value));
                     el.addEventListener('change', (e) => localStorage.setItem(field, e.target.value));
                 }
             });
-
-            // Auto-load last active DLL
             const lastId = localStorage.getItem('last_dlp_id');
-            if (lastId) {
-                loadFromHistory(parseInt(lastId));
-            }
+            if (lastId) loadFromHistory(parseInt(lastId));
         };
 
         function renderTemplate(data, subject, gradeLevel, contentStandard, performanceStandard, competency, teacherName = "Jhunrie G. Bayog") {
             const formattedCompetency = competency.split('\n').map(c => `<li>${c.trim()}</li>`).join('');
-            
             let daysHtml = '';
             data.days.forEach((day, index) => {
                 daysHtml += `
@@ -494,7 +603,6 @@
 
             return `
                 <div class="p-8 bg-white shadow-lg max-w-[210mm] mx-auto text-[11pt] leading-tight font-serif text-black min-h-[297mm] lesson-sheet border-2 border-gray-800">
-                    <!-- Header Section -->
                     <table class="w-full mb-1 font-sans border-none" style="border: none !important; width: 100%; border-collapse: collapse; table-layout: fixed;">
                         <tr style="border: none !important;">
                             <td style="width: 90px; border: none !important; vertical-align: middle; padding: 0;">
@@ -513,12 +621,10 @@
                         </tr>
                     </table>
                     <hr class="border-t border-black mb-4">
-
                     <div class="text-center mb-6 font-sans">
                         <p class="font-black text-base uppercase leading-tight">LESSON PLAN IN ${subject.toUpperCase()} ${gradeLevel}</p>
                         <p class="font-bold text-sm">Term 1 (SY: 2026-2027)</p>
                     </div>
-
                     <table class="w-full border-collapse border border-black mb-6 font-sans text-xs">
                         <tr class="border-b border-black">
                             <td class="p-2 font-bold w-[30%] border-r border-dashed border-black">Lesson Title</td>
@@ -541,22 +647,14 @@
                             <td class="p-2 outline-none" contenteditable="true" data-field="numSessions">${data.days.length} days</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-2 font-bold border-r border-dashed border-black">
-                                References<br>
-                                <span class="font-normal text-[9px]">(books, websites, toolkits, etc.)</span>
-                            </td>
+                            <td class="p-2 font-bold border-r border-dashed border-black">References<br><span class="font-normal text-[9px]">(books, websites, toolkits, etc.)</span></td>
                             <td contenteditable="true" class="p-2 field-editable outline-none" data-field="references">${data.references || ''}</td>
                         </tr>
                         <tr>
-                            <td class="p-2 font-bold border-r border-dashed border-black">
-                                Declaration of AI use<br>
-                                <span class="font-normal text-[9px]">Cite how AI was used in the formulation of the lesson plan. (See <u class="text-blue-600">DO 3 s.2026 Annex A.</u>)</span>
-                            </td>
+                            <td class="p-2 font-bold border-r border-dashed border-black">Declaration of AI use<br><span class="font-normal text-[9px]">Cite how AI was used in the formulation of the lesson plan.</span></td>
                             <td contenteditable="true" class="p-2 field-editable outline-none" data-field="ai_declaration">${data.ai_declaration || ''}</td>
                         </tr>
                     </table>
-
-                    <!-- I. INTENTIONS -->
                     <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6 uppercase">INTENTIONS</div>
                     <table class="w-full border-collapse border border-black mb-6">
                         <tr class="border-b border-black">
@@ -566,18 +664,9 @@
                         <tr class="border-b border-black">
                             <td class="p-2 font-bold border-r border-dashed border-black text-[11px] font-sans">Learning Objectives</td>
                             <td class="p-0 w-2/3 text-xs">
-                                <div class="p-2 border-b border-black">
-                                    <span class="font-bold">Knowledge:</span> 
-                                    <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_knowledge">${data.objectives.knowledge}</span>
-                                </div>
-                                <div class="p-2 border-b border-black">
-                                    <span class="font-bold">Skills:</span> 
-                                    <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_skills">${data.objectives.skills}</span>
-                                </div>
-                                <div class="p-2">
-                                    <span class="font-bold">Behavior:</span> 
-                                    <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_behavior">${data.objectives.behavior}</span>
-                                </div>
+                                <div class="p-2 border-b border-black"><span class="font-bold">Knowledge:</span> <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_knowledge">${data.objectives.knowledge}</span></div>
+                                <div class="p-2 border-b border-black"><span class="font-bold">Skills:</span> <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_skills">${data.objectives.skills}</span></div>
+                                <div class="p-2"><span class="font-bold">Behavior:</span> <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_behavior">${data.objectives.behavior}</span></div>
                             </td>
                         </tr>
                         <tr>
@@ -585,8 +674,6 @@
                             <td contenteditable="true" class="p-2 w-2/3 text-xs field-editable outline-none min-h-[40px]" data-field="learner_context">${data.learner_context || ''}</td>
                         </tr>
                     </table>
-
-                    <!-- L. LEARNING EXPERIENCE -->
                     <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">L. LEARNING EXPERIENCE (KARANASAN SA PAGKATUTO)</div>
                     <table class="w-full border-collapse border border-black mb-6">
                         <tr class="border-b border-black">
@@ -598,72 +685,41 @@
                             <td contenteditable="true" class="p-3 text-xs text-justify field-editable leading-relaxed outline-none" data-field="pre_lesson">${data.pre_lesson}</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">
-                                <div>iii. Lesson flow (Daloy ng Aralin)</div>
-                                <div class="mt-10 border-t border-gray-300 pt-4">
-                                    <p class="font-bold text-[10px] mb-2 uppercase text-gray-700">Flow Principles</p>
-                                    <ul class="list-disc ml-4 space-y-1 text-[8pt] italic font-normal leading-tight text-gray-500">
-                                        <li>Clear objectives</li>
-                                        <li>Guided before independent</li>
-                                        <li>Well-being check</li>
-                                        <li>Link to past competencies</li>
-                                        <li>Collaborative tasks</li>
-                                        <li>Reflective practice</li>
-                                        <li>Inclusive for all</li>
-                                    </ul>
-                                </div>
-                            </td>
+                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans"><div>iii. Lesson flow (Daloy ng Aralin)</div></td>
                             <td class="p-4 text-xs">
-                                <div class="space-y-6">
-                                    ${daysHtml}
-                                    <div class="mt-8 p-4 bg-blue-50/30 border-l-4 border-blue-600">
-                                        <p class="font-bold text-[10px] uppercase tracking-wider mb-2 font-sans text-blue-900 italic underline">Let's Reflect On It! (Magnilay Tayo!)</p>
-                                        <p contenteditable="true" class="italic text-[12px] leading-relaxed text-blue-950 font-serif field-editable outline-none" data-field="wrap_up">${data.wrap_up}</p>
-                                    </div>
-                                </div>
+                                <div class="space-y-6">${daysHtml}<div class="mt-8 p-4 bg-blue-50/30 border-l-4 border-blue-600"><p class="font-bold text-[10px] uppercase tracking-wider mb-2 font-sans text-blue-900 italic underline">Let's Reflect On It!</p><p contenteditable="true" class="italic text-[12px] leading-relaxed text-blue-950 font-serif field-editable outline-none" data-field="wrap_up">${data.wrap_up}</p></div></div>
                             </td>
                         </tr>
                         <tr>
-                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">iv. Opportunities for integration (Mga Oportunidad para sa Integrasyon)</td>
+                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">iv. Opportunities for integration</td>
                             <td contenteditable="true" class="p-3 text-xs text-justify field-editable outline-none" data-field="integration">${data.integration}</td>
                         </tr>
                     </table>
-
-                    <!-- A. ASSESSING LEARNING -->
-                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">A. ASSESSING LEARNING (PAGTATAYA SA PAGKATUTO)</div>
+                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">A. ASSESSING LEARNING</div>
                     <table class="w-full border-collapse border border-black mb-6">
                         <tr>
-                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">i. Formative assessments (Mga Pormatibong Pagtataya)</td>
+                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">i. Formative assessments</td>
                             <td contenteditable="true" class="p-3 w-2/3 text-xs text-justify field-editable leading-relaxed outline-none" data-field="assessment">${data.assessment}</td>
                         </tr>
                     </table>
-
-                    <!-- W. WAYS FORWARD -->
-                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">W. WAYS FORWARD (MGA HAKBANG PASULONG)</div>
+                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">W. WAYS FORWARD</div>
                     <table class="w-full border-collapse border border-black mb-8">
                         <tr class="border-b border-black">
-                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">i. Extended learning opportunities (Mga Karagdagang Oportunidad sa Pagkatuto)</td>
+                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">i. Extended learning opportunities</td>
                             <td contenteditable="true" class="p-3 w-2/3 text-xs text-justify font-serif field-editable leading-relaxed outline-none" data-field="home_task">${data.home_task}</td>
                         </tr>
                         <tr>
-                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">ii. Reflective practice (Replektibong Pagsasanay)</td>
+                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">ii. Reflective practice</td>
                             <td contenteditable="true" class="p-3 w-2/3 text-xs text-justify font-serif field-editable leading-relaxed outline-none" data-field="reflection">${data.reflection}</td>
                         </tr>
                     </table>
-
-                    <!-- Signature Area -->
-                    <div class="mt-12 font-sans">
-                        <div class="w-1/2">
-                            <p class="text-xs mb-1">Prepared by:</p>
-                            <p contenteditable="true" class="font-bold text-sm uppercase underline outline-none" data-field="teacherName">${teacherName}</p>
-                            <p class="text-[10px]">Teacher I</p>
-                        </div>
-                    </div>
+                    <div class="mt-12 font-sans"><div class="w-1/2"><p class="text-xs mb-1">Prepared by:</p><p contenteditable="true" class="font-bold text-sm uppercase underline outline-none" data-field="teacherName">${teacherName}</p><p class="text-[10px]">Teacher I</p></div></div>
                 </div>
             `;
         }
 
         async function generateDLP() {
+            log("Requesting new lesson plan from AI...", "system");
             const inputs = {
                 apiKey: document.getElementById('apiKey').value.trim(),
                 subject: document.getElementById('subject').value.trim(),
@@ -675,36 +731,21 @@
                 userSuggestions: document.getElementById('userSuggestions').value.trim(),
                 selectedModel: document.getElementById('modelSelect').value
             };
-
             if (!inputs.apiKey) { alert('Please enter an API Key'); return; }
-
             const btn = document.getElementById('generateBtn');
             const loading = document.getElementById('loading');
             const output = document.getElementById('outputContainer');
-
             btn.disabled = true;
             loading.classList.remove('hidden');
             output.classList.add('hidden');
-
             try {
                 const result = await callGenerateDLP(inputs);
-                const cleanJsonStr = result.text.replace(/^```json\n?|```$/gm, '').trim();
-                currentParsedData = JSON.parse(cleanJsonStr);
-                
+                log("AI response received.", "info");
+                currentParsedData = JSON.parse(result.text.replace(/^```json\n?|```$/gm, '').trim());
                 saveToHistory(currentParsedData, inputs);
-
-                document.getElementById('dlpContent').innerHTML = renderTemplate(
-                    currentParsedData, inputs.subject, inputs.gradeLevel, 
-                    inputs.contentStandard, inputs.performanceStandard, inputs.competency
-                );
-                
+                document.getElementById('dlpContent').innerHTML = renderTemplate(currentParsedData, inputs.subject, inputs.gradeLevel, inputs.contentStandard, inputs.performanceStandard, inputs.competency);
                 output.classList.remove('hidden');
-            } catch (error) {
-                alert('API Error: ' + error.message);
-            } finally {
-                btn.disabled = false;
-                loading.classList.add('hidden');
-            }
+            } catch (error) { log(`API Error: ${error.message}`, "error"); alert('API Error: ' + error.message); } finally { btn.disabled = false; loading.classList.add('hidden'); }
         }
     </script>
 </body>

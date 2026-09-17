@@ -15,53 +15,49 @@ async function callGenerateDLP(inputs) {
     const { apiKey, subject, gradeLevel, numDays, contentStandard, performanceStandard, competency, userSuggestions, selectedModel } = inputs;
 
     const prompt = `
-        Act as a DepEd Master Teacher crafting a student-centered, immersive instructional guide.
-        Generate a ${numDays}-day Lesson Plan based on:
+        Act as a DepEd Master Teacher. Generate a FINISHED ${numDays}-day Detailed Lesson Plan.
+        
         Subject: ${subject}
         Competency: ${competency}
         Content Standard: ${contentStandard}
         Performance Standard: ${performanceStandard}
         
-        ${userSuggestions ? `USER'S SPECIFIC REQUESTS/CONTEXT: "${userSuggestions}" - Integrate these suggestions or constraints into the lesson flow and activities.` : ''}
+        ${userSuggestions ? `USER'S SPECIFIC REQUESTS: "${userSuggestions}" - Naturally integrate these into the activities.` : ''}
 
-        CORE INSTRUCTION:
-        - TONE & DETAIL: Act as a Master Teacher. Every lesson must be "Substitute-Ready"—so detailed that another teacher could facilitate the class perfectly in your absence.
-        - STRUCTURE: For each day, create 4 distinct, thematic segments that follow a logical flow (e.g., Hook -> Core Insight -> Guided Task -> Synthesis).
-        - CREATIVE HEADERS: Do NOT use generic segment names. Come up with unique, creative, and thematic headers for every single segment (e.g., "The Sensory Awakening", "The Cartography of Limits"). 
-        - SCORING: For major activities, include a brief "Scoring Mechanism" (e.g., 2 Points for [Mastery], 1 Point for [Attempt]).
+        WRITING STYLE RULES (CRITICAL):
+        - DIRECT INSTRUCTION: Write as a teacher who has already finished the plan. Use direct statements: "The teacher will...", "Students will...", "Learners will...".
+        - NO AI COMMENTARY: Do NOT use phrases like "This activity aims to...", "This allows learners to...", "This is designed to...", or "The teacher should...". Just state the action.
+        - CONCISE & PRACTICAL: Use only as much text as needed to make the activity understandable. Avoid pedagogical theory, motivational essays, or long introductions.
+        - NO POETIC HEADERS: Use simple, functional headings like Motivation, Activity, Analysis, Discussion, Application, or Assessment. Do not use elaborate thematic titles.
+        - SCORING: Include a scoring mechanism only if it is a major performance task.
 
-        DAILY FLOW PRINCIPLES:
-        - DETAIL: Each segment header must be followed by a substantial, descriptive paragraph (3-5 sentences) providing step-by-step hints and pedagogical guidance.
-        - FORMATTING: Start each new segment (Header + Content) on a NEW LINE using <br><br>. DO NOT group them into one narrative paragraph. Use clear vertical spacing.
-
-        LANGUAGE RULE: The lesson plan MUST be written in the same language as the provided "Competency" and "Standards". If they are in English, the entire output must be in English. If they are in Filipino, the output must be in Filipino. DO NOT mix languages.
+        LANGUAGE RULE: Use the same language as the provided "Competency" and "Standards". If English, generate in English. If Filipino, generate in Filipino. Do not mix.
 
         RETURN A JSON OBJECT ONLY. NO MARKDOWN.
         Structure:
         {
-            "ai_declaration": "AI was merely used to correct grammar and spelling, also assist in building the lesson to become well-arranged ensuring best possible learning outcome and achieving the learning competencies.",
-            "references": "Provide 2-3 short, legitimate academic or pedagogical references (books or reputable websites) relevant to this specific topic. Format them as simple text lines separated by <br>.",
+            "ai_declaration": "AI was used to structure the lesson plan ensuring alignment with the provided DepEd competencies and standards.",
+            "references": "2-3 short, legitimate academic or pedagogical references.",
             "objectives": {
-                "knowledge": "Description for Knowledge objective",
-                "skills": "Description for Skills objective",
-                "behavior": "Description for Behavior objective"
+                "knowledge": "Concise Knowledge objective",
+                "skills": "Concise Skills objective",
+                "behavior": "Concise Behavior objective"
             },
             "learner_context": "", // ALWAYS LEAVE THIS EMPTY
             "resources": "<b>A. HAYO:</b> [Materials]<br><b>B. HINAY:</b> [Scaffolding]",
-            "pre_lesson": "Overall unit hook script.",
+            "pre_lesson": "The actual opening activity or teacher action (Concise).",
             "days": [
                 {
-                    "title": "Creative/Thematic Title. DO NOT include the word 'Day' or its number here.",
-                    "content": "A wordy, sophisticated script of the session flow. Use your creative headers for each segment. IMPORTANT: Start each segment (Header + Content) with <br><br> to ensure vertical spacing."
+                    "title": "Simple functional title (e.g., Motivation and Basic Concepts). No Day number.",
+                    "content": "The actual classroom procedure. Use 'The teacher will...' and 'Students will...'. Use simple headings if needed. Separate segments with <br><br>."
                 }
             ],
-            "wrap_up": "Closing thought script.",
-            "integration": "Act as a DepEd teacher writing this section for an ILAW Daily Lesson Log. In a single paragraph, describe one cohesive, hands-on classroom activity where students naturally apply skills and concepts from other learning areas, utilize ICT, or practice 21st-century skills. CRITICALLY: Do not explicitly name the other subjects being integrated. Instead, design the activity so that the students, through the process of completing the task, will organically discover and realize the connections to other fields of study and real-world themes on their own. Ensure the integration feels completely seamless, unforced, and discovery-driven. If no genuine, natural activity connections exist for this specific topic, output 'N/A'.",
-            "assessment": "Summary of indicators.",
-            "reflection": "Teacher self-check.",
-            "home_task": "Extension task."
-        }
-        Ensure content is WORDY, SMART, and CLEANly typed. Use HTML tags (<ul>, <li>, <b>, <p>, <br>) inside JSON strings.`;
+            "wrap_up": "Concise closing thought or teacher action.",
+            "integration": "A single paragraph describing one hands-on activity where students naturally apply skills from other areas or 21st-century skills. Do not explicitly name the other subjects.",
+            "assessment": "Concise statement of the actual assessment method.",
+            "reflection": "Concise teacher self-check.",
+            "home_task": "Clear, manageable extension task."
+        }`;
 
     const modelsToTry = selectedModel === 'gemini-1.5-pro'
         ? [AI_CONFIG.PRO_MODEL, { name: 'gemini-1.5-pro', version: 'v1' }, AI_CONFIG.LITE_MODEL]
