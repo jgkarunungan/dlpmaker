@@ -24,39 +24,59 @@ async function callGenerateDLP(inputs) {
         
         ${userSuggestions ? `USER'S SPECIFIC REQUESTS: "${userSuggestions}" - Naturally integrate these into the activities.` : ''}
 
+        OUTPUT LANGUAGE HIERARCHY & STRICT RULE (CRITICAL):
+        Determine the TARGET OUTPUT LANGUAGE using this strict priority hierarchy:
+        1. Explicit teacher request regarding language in USER'S SPECIFIC REQUESTS (if provided).
+        2. Primary language of the Learning Competency and Curriculum Standards (Competency, Content Standard, Performance Standard).
+        3. Dominant language of the Learning Competency if mixed languages exist in standards.
+        4. Subject title as a fallback only if competency and standards are unavailable or ambiguous.
+
+        EVERY GENERATED FIELD VALUE, HEADING, SUBHEADING, LABEL, ACTIVITY TITLE, TEACHER INSTRUCTION, STUDENT ACTION, OBJECTIVE, RESOURCE DESCRIPTION, ASSESSMENT, REFLECTION, AND EXTENDED TASK MUST BE 100% IN THE TARGET OUTPUT LANGUAGE.
+
+        LANGUAGE SPECIFIC GUIDELINES:
+        - When Target Language is FILIPINO:
+          - Write ALL field values, activity titles, teacher/student actions, objectives, resources, assessment, reflection, wrap-up, and homework entirely in professional, natural Filipino.
+          - Use natural Filipino subheadings inside lesson flow content (e.g., <b>Pagganyak</b>, <b>Gawain</b>, <b>Pagsusuri</b>, <b>Pagtatalakay</b>, <b>Paglalapat</b>, <b>Pagtataya</b>).
+          - Use direct Filipino teacher/student phrasing (e.g., "Magbibigay ang guro ng...", "Ipapagawa ng guro sa mga mag-aaral...", "Magsasagawa ang mga mag-aaral ng...").
+          - Translate resource descriptions naturally (e.g., HAYO: Mga kagamitan sa pagtuturo, HINAY: Gabay at suporta sa pagkatuto).
+          - Translate ai_declaration and references into natural Filipino.
+          - Preserve established proper nouns, official names, formulas, and technical terms (e.g., Katipunan, Jose Rizal, HTML) accurately without unnatural translation, while keeping all surrounding instructional text and labels in Filipino.
+        - When Target Language is ENGLISH:
+          - Write ALL field values, headings, teacher/student actions ("The teacher will...", "Students will..."), objectives, resources, assessment, etc., in English.
+
         WRITING STYLE RULES (CRITICAL):
-        - DIRECT INSTRUCTION: Write as a teacher who has already finished the plan. Use direct statements: "The teacher will...", "Students will...", "Learners will...".
-        - NO AI COMMENTARY: Do NOT use phrases like "This activity aims to...", "This allows learners to...", "This is designed to...", or "The teacher should...". Just state the action.
+        - DIRECT INSTRUCTION: Write as a teacher who has already finished the plan. State actions directly.
+        - NO AI COMMENTARY: Do NOT use meta-commentary like "This activity aims to...", "Layunin ng gawaing ito na...", "This allows learners to...", etc. Just state the actual classroom procedure.
         - CONCISE & PRACTICAL: Use only as much text as needed to make the activity understandable. Avoid pedagogical theory, motivational essays, or long introductions.
-        - NO POETIC HEADERS: Use simple, functional headings like Motivation, Activity, Analysis, Discussion, Application, or Assessment. Do not use elaborate thematic titles.
+        - NO POETIC HEADERS: Use simple, functional headings appropriate for the target language.
         - SCORING: Include a scoring mechanism only if it is a major performance task.
 
-        LANGUAGE RULE: Use the same language as the provided "Competency" and "Standards". If English, generate in English. If Filipino, generate in Filipino. Do not mix.
-
         RETURN A JSON OBJECT ONLY. NO MARKDOWN.
+        STRICT DATA STRUCTURE REQUIREMENT: Keep JSON property keys EXACTLY as named below. Do NOT translate JSON key names. Translate ONLY the generated string values.
+
         Structure:
         {
-            "ai_declaration": "AI was used to structure the lesson plan ensuring alignment with the provided DepEd competencies and standards.",
-            "references": "2-3 short, legitimate academic or pedagogical references.",
+            "ai_declaration": "AI declaration in Target Language",
+            "references": "2-3 short academic or pedagogical references in Target Language",
             "objectives": {
-                "knowledge": "Concise Knowledge objective",
-                "skills": "Concise Skills objective",
-                "behavior": "Concise Behavior objective"
+                "knowledge": "Concise Knowledge objective in Target Language",
+                "skills": "Concise Skills objective in Target Language",
+                "behavior": "Concise Behavior objective in Target Language"
             },
             "learner_context": "", // ALWAYS LEAVE THIS EMPTY
-            "resources": "<b>A. HAYO:</b> [Materials]<br><b>B. HINAY:</b> [Scaffolding]",
-            "pre_lesson": "The actual opening activity or teacher action (Concise).",
+            "resources": "<b>A. HAYO:</b> [Materials description in Target Language]<br><b>B. HINAY:</b> [Scaffolding description in Target Language]",
+            "pre_lesson": "Opening activity or teacher action in Target Language (Concise).",
             "days": [
                 {
-                    "title": "Simple functional title (e.g., Motivation and Basic Concepts). No Day number.",
-                    "content": "The actual classroom procedure. Use 'The teacher will...' and 'Students will...'. Use simple headings if needed. Separate segments with <br><br>."
+                    "title": "Simple functional title in Target Language (No Day number).",
+                    "content": "Actual classroom procedure in Target Language. Use direct teacher/student actions. Use simple functional headings in Target Language separated by <br><br>."
                 }
             ],
-            "wrap_up": "Concise closing thought or teacher action.",
-            "integration": "A single paragraph describing one hands-on activity where students naturally apply skills from other areas or 21st-century skills. Do not explicitly name the other subjects.",
-            "assessment": "Concise statement of the actual assessment method.",
-            "reflection": "Concise teacher self-check.",
-            "home_task": "Clear, manageable extension task."
+            "wrap_up": "Concise closing thought or teacher action in Target Language.",
+            "integration": "Hands-on integration activity in Target Language.",
+            "assessment": "Formative assessment method in Target Language.",
+            "reflection": "Concise teacher self-check in Target Language.",
+            "home_task": "Clear, manageable extension task in Target Language."
         }`;
 
     const modelsToTry = selectedModel === 'gemini-1.5-pro'
@@ -85,7 +105,7 @@ async function callRefineSegment(inputs) {
 
         TONE RULE: Professional and sophisticated. Avoid administrative jargon.
         FORMATTING RULE: If there are multiple steps, separate them with <br><br>. Use <b> tags for headers.
-        LANGUAGE RULE: Maintain the same language (Filipino or English) as the current segment text.
+        STRICT LANGUAGE RULE: Maintain the EXACT language (Filipino or English) of the provided segment text. If the segment is in Filipino, write the entire refined text including all headings, subheadings, teacher/student actions, and labels in natural Filipino. Do NOT insert English headings or labels into Filipino content.
 
         Please rewrite this segment to fulfill the request. RETURN ONLY THE UPDATED TEXT.
         USE HTML TAGS (<ul>, <li>, <b>, <p>, <br>) IF NECESSARY.

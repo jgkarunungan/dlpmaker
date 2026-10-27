@@ -12,49 +12,72 @@ const AI_CONFIG = {
  * Generates a full DLP based on user inputs
  */
 async function callGenerateDLP(inputs) {
-    const { apiKey, subject, gradeLevel, numDays, contentStandard, performanceStandard, competency, selectedModel } = inputs;
+    const { apiKey, subject, gradeLevel, numDays, contentStandard, performanceStandard, competency, userSuggestions, selectedModel } = inputs;
 
     const prompt = `
-        Act as a DepEd Master Teacher crafting a student-centered, immersive instructional guide.
-        Generate a ${numDays}-day Lesson Plan based on:
+        Act as a DepEd Master Teacher. Generate a FINISHED ${numDays}-day Detailed Lesson Plan.
+
         Subject: ${subject}
         Competency: ${competency}
         Content Standard: ${contentStandard}
         Performance Standard: ${performanceStandard}
 
-        CORE INSTRUCTION:
-        - Sound like a Facilitator's Script (directly addressing students or describing professional interaction).
-        - Ensure coherence: The ${numDays} days must form a logical "Instructional Arc".
-        - VARIETY IS KEY: Do NOT repeat the same routine every day. Use diverse strategies (Socratic Seminars, Gamified Challenges, Gallery Walks, Case Studies, etc.).
+        ${userSuggestions ? `USER'S SPECIFIC REQUESTS: "${userSuggestions}" - Naturally integrate these into the activities.` : ''}
 
-        DAILY FLOW PRINCIPLES (Be creative and thematic with segment headers):
-        - For each session, create unique and appropriate headers for each segment of the flow (e.g., "The Bridge", "Connecting the Dots", "The Deep Dive").
-        - The headers should reflect the specific activity or pedagogical goal of that segment.
-        - Ensure the flow generally moves from an engaging start, through deep immersion/interaction, to a meaningful check for understanding and assessment.
-        - Use HTML <b> tags for these headers.
-        - FORMATTING: Start each new segment on a NEW LINE using <br><br>. Do not group them into one narrative paragraph.
+        OUTPUT LANGUAGE HIERARCHY & STRICT RULE (CRITICAL):
+        Determine the TARGET OUTPUT LANGUAGE using this strict priority hierarchy:
+        1. Explicit teacher request regarding language in USER'S SPECIFIC REQUESTS (if provided).
+        2. Primary language of the Learning Competency and Curriculum Standards (Competency, Content Standard, Performance Standard).
+        3. Dominant language of the Learning Competency if mixed languages exist in standards.
+        4. Subject title as a fallback only if competency and standards are unavailable or ambiguous.
 
-        LANGUAGE RULE: The lesson plan MUST be written in the same language as the provided "Competency" and "Standards". If they are in English, the entire output must be in English. If they are in Filipino, the output must be in Filipino. DO NOT mix languages.
+        EVERY GENERATED FIELD VALUE, HEADING, SUBHEADING, LABEL, ACTIVITY TITLE, TEACHER INSTRUCTION, STUDENT ACTION, OBJECTIVE, RESOURCE DESCRIPTION, ASSESSMENT, REFLECTION, AND EXTENDED TASK MUST BE 100% IN THE TARGET OUTPUT LANGUAGE.
+
+        LANGUAGE SPECIFIC GUIDELINES:
+        - When Target Language is FILIPINO:
+          - Write ALL field values, activity titles, teacher/student actions, objectives, resources, assessment, reflection, wrap-up, and homework entirely in professional, natural Filipino.
+          - Use natural Filipino subheadings inside lesson flow content (e.g., <b>Pagganyak</b>, <b>Gawain</b>, <b>Pagsusuri</b>, <b>Pagtatalakay</b>, <b>Paglalapat</b>, <b>Pagtataya</b>).
+          - Use direct Filipino teacher/student phrasing (e.g., "Magbibigay ang guro ng...", "Ipapagawa ng guro sa mga mag-aaral...", "Magsasagawa ang mga mag-aaral ng...").
+          - Translate resource descriptions naturally (e.g., HAYO: Mga kagamitan sa pagtuturo, HINAY: Gabay at suporta sa pagkatuto).
+          - Translate ai_declaration and references into natural Filipino.
+          - Preserve established proper nouns, official names, formulas, and technical terms (e.g., Katipunan, Jose Rizal, HTML) accurately without unnatural translation, while keeping all surrounding instructional text and labels in Filipino.
+        - When Target Language is ENGLISH:
+          - Write ALL field values, headings, teacher/student actions ("The teacher will...", "Students will..."), objectives, resources, assessment, etc., in English.
+
+        WRITING STYLE RULES (CRITICAL):
+        - DIRECT INSTRUCTION: Write as a teacher who has already finished the plan. State actions directly.
+        - NO AI COMMENTARY: Do NOT use meta-commentary like "This activity aims to...", "Layunin ng gawaing ito na...", "This allows learners to...", etc. Just state the actual classroom procedure.
+        - CONCISE & PRACTICAL: Use only as much text as needed to make the activity understandable. Avoid pedagogical theory, motivational essays, or long introductions.
+        - NO POETIC HEADERS: Use simple, functional headings appropriate for the target language.
+        - SCORING: Include a scoring mechanism only if it is a major performance task.
 
         RETURN A JSON OBJECT ONLY. NO MARKDOWN.
+        STRICT DATA STRUCTURE REQUIREMENT: Keep JSON property keys EXACTLY as named below. Do NOT translate JSON key names. Translate ONLY the generated string values.
+
         Structure:
         {
-            "objectives": "Detailed KSA objectives using HTML <ul><li>...</li></ul>",
-            "resources": "<b>A. HAYO:</b> [Materials]<br><b>B. HINAY:</b> [Scaffolding]",
-            "pre_lesson": "Overall unit hook script.",
+            "ai_declaration": "AI declaration in Target Language",
+            "references": "2-3 short academic or pedagogical references in Target Language",
+            "objectives": {
+                "knowledge": "Concise Knowledge objective in Target Language",
+                "skills": "Concise Skills objective in Target Language",
+                "behavior": "Concise Behavior objective in Target Language"
+            },
+            "learner_context": "", // ALWAYS LEAVE THIS EMPTY
+            "resources": "<b>A. HAYO:</b> [Materials description in Target Language]<br><b>B. HINAY:</b> [Scaffolding description in Target Language]",
+            "pre_lesson": "Opening activity or teacher action in Target Language (Concise).",
             "days": [
                 {
-                    "title": "Creative/Thematic Title (e.g., 'The Anatomy of Boundaries'). DO NOT include the word 'Day' or its number here.",
-                    "content": "A wordy, sophisticated script of the session flow. Use your creative headers for each segment. IMPORTANT: Start each segment (Header + Content) with <br><br> to ensure vertical spacing."
+                    "title": "Simple functional title in Target Language (No Day number).",
+                    "content": "Actual classroom procedure in Target Language. Use direct teacher/student actions. Use simple functional headings in Target Language separated by <br><br>."
                 }
             ],
-            "wrap_up": "Closing thought script.",
-            "integration": "Cross-disciplinary links.",
-            "assessment": "Summary of indicators.",
-            "reflection": "Teacher self-check.",
-            "home_task": "Extension task."
-        }
-        Ensure content is WORDY, SMART, and CLEANly typed. Use HTML tags (<ul>, <li>, <b>, <p>, <br>) inside JSON strings.`;
+            "wrap_up": "Concise closing thought or teacher action in Target Language.",
+            "integration": "Hands-on integration activity in Target Language.",
+            "assessment": "Formative assessment method in Target Language.",
+            "reflection": "Concise teacher self-check in Target Language.",
+            "home_task": "Clear, manageable extension task in Target Language."
+        }`;
 
     const modelsToTry = selectedModel === 'gemini-1.5-pro'
         ? [AI_CONFIG.PRO_MODEL, { name: 'gemini-1.5-pro', version: 'v1' }, AI_CONFIG.LITE_MODEL]
@@ -70,15 +93,19 @@ async function callRefineSegment(inputs) {
     const { apiKey, subject, promptText, context, selectedModel } = inputs;
 
     const refinePrompt = `
-        Act as a DepEd Master Teacher crafting a student-centered instructional guide.
+        Act as a DepEd Master Teacher.
         I have this specific segment from a lesson plan in ${subject}:
         "${context}"
 
         User Request: "${promptText}"
 
-        TONE RULE: Avoid administrative jargon. Speak as if you are directly guiding the teacher on how to talk to and engage the students. The language should be professional, immersive, and sophisticated.
-        FORMATTING RULE: If there are multiple segments or steps, separate them with <br><br> to ensure they don't pile up in a single paragraph. Use <b> tags for headers.
-        LANGUAGE RULE: Maintain the same language (Filipino or English) as the current segment text provided above.
+        ADAPTIVITY RULE: You must match the "scale" of the request.
+        - If the user asks for a "little fix," "correction," or minor wording change, provide ONLY the concise updated text. Do NOT add extra paragraphs or descriptions.
+        - If the user asks for a "new activity," "full rewrite," or "more detail," then provide a substantial, "Substitute-Ready" description (3-5 sentences) with pedagogical hints.
+
+        TONE RULE: Professional and sophisticated. Avoid administrative jargon.
+        FORMATTING RULE: If there are multiple steps, separate them with <br><br>. Use <b> tags for headers.
+        STRICT LANGUAGE RULE: Maintain the EXACT language (Filipino or English) of the provided segment text. If the segment is in Filipino, write the entire refined text including all headings, subheadings, teacher/student actions, and labels in natural Filipino. Do NOT insert English headings or labels into Filipino content.
 
         Please rewrite this segment to fulfill the request. RETURN ONLY THE UPDATED TEXT.
         USE HTML TAGS (<ul>, <li>, <b>, <p>, <br>) IF NECESSARY.
