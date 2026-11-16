@@ -44,6 +44,12 @@ async function callGenerateDLP(inputs) {
         - When Target Language is ENGLISH:
           - Write ALL field values, headings, teacher/student actions ("The teacher will...", "Students will..."), objectives, resources, assessment, etc., in English.
 
+        AI USE DECLARATION:
+        Use the following standard declaration verbatim for ai_declaration in the TARGET OUTPUT LANGUAGE:
+        Filipino: ${JSON.stringify(aiUseDeclaration('fil'))}
+        English: ${JSON.stringify(aiUseDeclaration('en'))}
+        Describe the tools as guides and advisers and retain the teacher's responsibility for review, adaptation, and final content. Do not claim that teacher review has already occurred.
+
         WRITING STYLE RULES (CRITICAL):
         - DIRECT INSTRUCTION: Write as a teacher who has already finished the plan. State actions directly.
         - NO AI COMMENTARY: Do NOT use meta-commentary like "This activity aims to...", "Layunin ng gawaing ito na...", "This allows learners to...", etc. Just state the actual classroom procedure.
@@ -54,8 +60,12 @@ async function callGenerateDLP(inputs) {
         RETURN A JSON OBJECT ONLY. NO MARKDOWN.
         STRICT DATA STRUCTURE REQUIREMENT: Keep JSON property keys EXACTLY as named below. Do NOT translate JSON key names. Translate ONLY the generated string values.
 
+        Also return "output_language": "fil" for Filipino or "en" for English, matching the TARGET OUTPUT LANGUAGE above. The app uses this to translate the fixed school-template labels.
+        Always leave learner_context as an empty string for the teacher to complete.
+
         Structure:
         {
+            "output_language": "fil",
             "ai_declaration": "AI declaration in Target Language",
             "references": "2-3 short academic or pedagogical references in Target Language",
             "objectives": {
@@ -63,7 +73,7 @@ async function callGenerateDLP(inputs) {
                 "skills": "Concise Skills objective in Target Language",
                 "behavior": "Concise Behavior objective in Target Language"
             },
-            "learner_context": "", // ALWAYS LEAVE THIS EMPTY
+            "learner_context": "",
             "resources": "<b>A. HAYO:</b> [Materials description in Target Language]<br><b>B. HINAY:</b> [Scaffolding description in Target Language]",
             "pre_lesson": "Opening activity or teacher action in Target Language (Concise).",
             "days": [

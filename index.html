@@ -6,6 +6,8 @@
     <title>AI DLP Maker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="ai-core.js"></script>
+    <script src="lesson-language.js"></script>
+    <script src="lesson-backup.js"></script>
     <!-- DOCX Template Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.42.0/docxtemplater.js"></script>
     <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
@@ -161,6 +163,16 @@
                         </button>
                     </div>
                 </div>
+
+                <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3" aria-label="Lesson backup">
+                    <h2 class="font-bold text-slate-700 text-xs uppercase">Lesson Backup</h2>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="downloadLessonBackup()" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-bold">Save all lessons (.json)</button>
+                        <button type="button" onclick="document.getElementById('backupFile').click()" class="bg-slate-100 border border-slate-200 px-3 py-2 rounded-lg text-xs font-bold">Restore JSON backup</button>
+                    </div>
+                    <input type="file" id="backupFile" accept=".json,application/json" onchange="restoreLessonBackup(this)" class="hidden">
+                    <p id="backupStatus" role="status" aria-live="polite" class="text-xs text-slate-600">Save a backup after making changes. On another device, open this app and restore the JSON file. API keys are excluded. Restoring adds lessons to your existing history.</p>
+                </section>
 
                 <!-- History Section -->
                 <div id="historyContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden">
@@ -332,7 +344,7 @@
 
         function saveToHistory(data, inputs) {
             const newItem = {
-                id: Date.now(),
+                id: Math.max(Date.now(), ...history.map(item => item.id + 1)),
                 timestamp: new Date().toLocaleString(),
                 subject: inputs.subject,
                 gradeLevel: inputs.gradeLevel,
@@ -341,12 +353,14 @@
                 performanceStandard: inputs.performanceStandard,
                 competency: inputs.competency,
                 userSuggestions: inputs.userSuggestions,
+                numDays: inputs.numDays,
+                selectedModel: inputs.selectedModel,
                 data: data
             };
+            const updatedHistory = [newItem, ...history];
+            localStorage.setItem('dlp_history', JSON.stringify(updatedHistory));
+            history = updatedHistory;
             currentHistoryId = newItem.id;
-            history.unshift(newItem);
-            if (history.length > 15) history.pop();
-            localStorage.setItem('dlp_history', JSON.stringify(history));
             localStorage.setItem('last_dlp_id', newItem.id);
             renderHistoryList();
         }
@@ -359,8 +373,8 @@
             list.innerHTML = history.map(item => `
                 <div onclick="loadFromHistory(${item.id})" class="cursor-pointer border ${item.id === currentHistoryId ? 'border-blue-500 bg-blue-50' : 'border-slate-100'} p-3 rounded-lg hover:bg-blue-50 transition-all flex justify-between items-center group">
                     <div>
-                        <p class="font-bold text-xs text-slate-700 group-hover:text-blue-600 transition-colors">${item.subject || 'Untitled'}</p>
-                        <p class="text-[9px] text-slate-400 font-medium">${item.timestamp} • Grade ${item.gradeLevel}</p>
+                        <p class="font-bold text-xs text-slate-700 group-hover:text-blue-600 transition-colors">${escapeLessonText(item.subject || 'Untitled')}</p>
+                        <p class="text-[9px] text-slate-400 font-medium">${escapeLessonText(item.timestamp)} • Grade ${escapeLessonText(item.gradeLevel)}</p>
                     </div>
                     <button onclick="deleteHistoryItem(event, ${item.id})" class="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -373,6 +387,7 @@
             const item = history.find(h => h.id === id);
             if (!item) return;
             currentParsedData = item.data;
+            currentParsedData.output_language = resolveLessonLanguage(currentParsedData, item);
             currentHistoryId = id;
             document.getElementById('subject').value = item.subject;
             document.getElementById('gradeLevel').value = item.gradeLevel;
@@ -380,6 +395,8 @@
             document.getElementById('performanceStandard').value = item.performanceStandard || '';
             document.getElementById('competency').value = item.competency;
             document.getElementById('userSuggestions').value = item.userSuggestions || '';
+            document.getElementById('numDays').value = String(item.data.days.length);
+            if (item.selectedModel) document.getElementById('modelSelect').value = item.selectedModel;
             document.getElementById('dlpContent').innerHTML = renderTemplate(currentParsedData, item.subject, item.gradeLevel, item.contentStandard || '', item.performanceStandard || '', item.competency, item.teacherName || "Jhunrie G. Bayog");
             document.getElementById('outputContainer').classList.remove('hidden');
             document.getElementById('emptyState').classList.add('hidden');
@@ -551,6 +568,44 @@
             return cells[c];
         }
 
+        function localizeFilipinoWordLabels(xmlDoc, table, fields, data, wNS) {
+            const label = text => lessonLabel('fil', text);
+            const fieldLabels = {
+                lessonTitle: 'Lesson Title', subject: 'Learning Area/s',
+                teacherName: 'Name of Teacher/s', gradeLevel: 'Grade Level and Section',
+                sessions: 'No. of Sessions', competency: 'Learning Competency and Curriculum Standards',
+                learnerContext: 'Learner Context', preLesson: 'ii. Pre-lesson activity (Gawain Bago ang Aralin)',
+                integration: 'iv. Opportunities for integration', assessment: 'i. Formative assessments',
+                extendedLearning: 'i. Extended learning opportunities', reflection: 'ii. Reflective practice'
+            };
+            for (const [field, text] of Object.entries(fieldLabels)) {
+                writePlainTextToCell(xmlDoc, getCell(table, fields[field].row, 0, wNS), label(text), wNS);
+            }
+            const writeLabel = (row, text) => writePlainTextToCell(xmlDoc, getCell(table, row, 0, wNS), text, wNS);
+            writeLabel(fields.references.row, label('References') + '\n' + label('(books, websites, toolkits, etc.)'));
+            writeLabel(fields.aiDeclaration.row, label('Declaration of AI use') + '\n' + label('Cite how AI was used in the formulation of the lesson plan.') + '\n(Tingnan ang DO 3 s.2026 Annex A.)');
+            writeLabel(fields.knowledge.row, label('Learning Objectives'));
+            for (const [field, english] of [['knowledge', 'Knowledge:'], ['skills', 'Skills:'], ['behavior', 'Behavior:']]) {
+                writePlainTextToCell(xmlDoc, getCell(table, fields[field].row, fields[field].cell, wNS), label(english) + '\n' + data[field], wNS);
+            }
+            writeLabel(fields.resources.row, label('i. Learning resources (Mga Kagamitan sa Pagkatuto)'));
+            writeLabel(fields.flow.row, label('iii. Lesson flow (Daloy ng Aralin)') + '\n' + [
+                'Linawin ang mga layunin para sa lahat ng mag-aaral.',
+                'Gabayan ang mga mag-aaral bago nila subukan ang gawain nang mag-isa.',
+                'Suriin ang kalagayan, pag-unawa, at pagkatuto ng mga mag-aaral.',
+                'Iugnay ang bagong konsepto sa mga naunang kasanayan.',
+                'Hikayatin ang pagtutulungan ng mga mag-aaral.',
+                'Anyayahan silang pagnilayan ang kabuluhan ng mga natutuhan.',
+                'Isaalang-alang ang iba’t ibang kakayahan, paraan ng pagkatuto, at kalagayan ng mga mag-aaral.'
+            ].join('\n'));
+            for (const [row, english] of [
+                [fields.competency.row - 1, 'INTENTIONS'],
+                [fields.resources.row - 1, 'L. LEARNING EXPERIENCE (KARANASAN SA PAGKATUTO)'],
+                [fields.assessment.row - 1, 'A. ASSESSING LEARNING'],
+                [fields.extendedLearning.row - 1, 'W. WAYS FORWARD']
+            ]) writeLabel(row, label(english));
+        }
+
         async function downloadDoc() {
             if (!currentParsedData) { alert("Please generate a lesson plan first."); return; }
             log("Starting production DOCX export...", "system");
@@ -573,13 +628,13 @@
 
                 const dataToExport = {
                     lessonTitle: getClean(currentParsedData.subject || inputs.subject),
-                    subject: getClean(currentParsedData.subject || inputs.subject),
+                    subject: getClean(currentParsedData.learningArea || inputs.subject),
                     teacherName: getClean(currentParsedData.teacherName || "Jhunrie G. Bayog"),
                     gradeLevel: getClean(currentParsedData.gradeLevel || inputs.gradeLevel),
-                    sessions: String(currentParsedData.days?.length || 0),
+                    sessions: getClean(currentParsedData.numSessions || String(currentParsedData.days?.length || 0)),
                     references: getClean(currentParsedData.references),
                     aiDeclaration: getClean(currentParsedData.ai_declaration),
-                    competency: getClean(inputs.competency),
+                    competency: getClean(currentParsedData.competency_standard ?? inputs.competency),
                     knowledge: getClean(currentParsedData.objectives?.knowledge),
                     skills: getClean(currentParsedData.objectives?.skills),
                     behavior: getClean(currentParsedData.objectives?.behavior),
@@ -591,9 +646,11 @@
                     reflection: getClean(currentParsedData.reflection),
                 };
 
+                const language = resolveLessonLanguage(currentParsedData, history.find(item => item.id === currentHistoryId) || inputs);
+                const label = text => lessonLabel(language, text);
                 let flowText = "";
-                currentParsedData.days.forEach((day, i) => { flowText += `DAY ${i + 1}: ${day.title}\n${day.content}\n\n`; });
-                flowText += `Let's Reflect On It! (Magnilay Tayo!)\n${currentParsedData.wrap_up || ""}`;
+                currentParsedData.days.forEach((day, i) => { flowText += `${label("DAY")} ${i + 1}: ${day.title}\n${day.content}\n\n`; });
+                flowText += `${label("Let's Reflect On It!")}\n${currentParsedData.wrap_up || ""}`;
                 dataToExport.flow = getClean(flowText);
 
                 // Populate fields
@@ -627,6 +684,8 @@
                 writePlainTextToCell(xmlDoc, getCell(table1, fields.extendedLearning.row, fields.extendedLearning.cell, wNS), dataToExport.home_task, wNS);
                 writePlainTextToCell(xmlDoc, getCell(table1, fields.reflection.row, fields.reflection.cell, wNS), dataToExport.reflection, wNS);
 
+                if (language === "fil") localizeFilipinoWordLabels(xmlDoc, table1, fields, dataToExport, wNS);
+
                 const serializer = new XMLSerializer();
                 zip.file(docPath, serializer.serializeToString(xmlDoc));
                 const out = zip.generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
@@ -653,12 +712,14 @@
         };
 
         function renderTemplate(data, subject, gradeLevel, contentStandard, performanceStandard, competency, teacherName = "Jhunrie G. Bayog") {
-            const formattedCompetency = competency.split('\n').map(c => `<li>${c.trim()}</li>`).join('');
+            const language = resolveLessonLanguage(data, { subject, contentStandard, performanceStandard, competency });
+            const label = text => lessonLabel(language, text);
+            const formattedCompetency = competency.split('\n').map(c => `<li>${escapeLessonText(c.trim())}</li>`).join('');
             let daysHtml = '';
             data.days.forEach((day, index) => {
                 daysHtml += `
                     <div class="mb-6 lesson-segment">
-                        <p class="font-bold underline text-[11px] mb-2 uppercase tracking-tight font-sans">DAY ${index + 1}: ${day.title}</p>
+                        <p class="font-bold underline text-[11px] mb-2 uppercase tracking-tight font-sans">${label("DAY")} ${index + 1}: ${escapeLessonText(day.title)}</p>
                         <div contenteditable="true" class="text-justify field-editable leading-relaxed outline-none" data-field="day_${index}">${day.content}</div>
                     </div>
                 `;
@@ -685,98 +746,98 @@
                     </table>
                     <hr class="border-t border-black mb-4">
                     <div class="text-center mb-6 font-sans">
-                        <p class="font-black text-base uppercase leading-tight">LESSON PLAN IN ${subject.toUpperCase()} ${gradeLevel}</p>
-                        <p class="font-bold text-sm">Term 1 (SY: 2026-2027)</p>
+                        <p class="font-black text-base uppercase leading-tight">${label("LESSON PLAN IN")} ${escapeLessonText(subject.toUpperCase())} ${escapeLessonText(gradeLevel)}</p>
+                        <p class="font-bold text-sm">${label("Term 1 (SY: 2026-2027)")}</p>
                     </div>
                     <table class="w-full border-collapse border border-black mb-6 font-sans text-xs">
                         <tr class="border-b border-black">
-                            <td class="p-2 font-bold w-[30%] border-r border-dashed border-black">Lesson Title</td>
-                            <td class="p-2 uppercase font-medium outline-none" contenteditable="true" data-field="subject">${subject}</td>
+                            <td class="p-2 font-bold w-[30%] border-r border-dashed border-black">${label("Lesson Title")}</td>
+                            <td class="p-2 uppercase font-medium outline-none" contenteditable="true" data-field="subject">${data.subject ?? escapeLessonText(subject)}</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-2 font-bold border-r border-dashed border-black">Learning Area/s</td>
-                            <td class="p-2 outline-none" contenteditable="true" data-field="learningArea">${subject}</td>
+                            <td class="p-2 font-bold border-r border-dashed border-black">${label("Learning Area/s")}</td>
+                            <td class="p-2 outline-none" contenteditable="true" data-field="learningArea">${data.learningArea ?? escapeLessonText(subject)}</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-2 font-bold border-r border-dashed border-black">Name of Teacher/s</td>
-                            <td class="p-2 outline-none" contenteditable="true" data-field="teacherName">${teacherName}</td>
+                            <td class="p-2 font-bold border-r border-dashed border-black">${label("Name of Teacher/s")}</td>
+                            <td class="p-2 outline-none" contenteditable="true" data-field="teacherName">${data.teacherName ?? escapeLessonText(teacherName)}</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-2 font-bold border-r border-dashed border-black">Grade Level and Section</td>
-                            <td class="p-2 outline-none" contenteditable="true" data-field="gradeLevel">${gradeLevel}</td>
+                            <td class="p-2 font-bold border-r border-dashed border-black">${label("Grade Level and Section")}</td>
+                            <td class="p-2 outline-none" contenteditable="true" data-field="gradeLevel">${data.gradeLevel ?? escapeLessonText(gradeLevel)}</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-2 font-bold border-r border-dashed border-black">No. of Sessions</td>
-                            <td class="p-2 outline-none" contenteditable="true" data-field="numSessions">${data.days.length} days</td>
+                            <td class="p-2 font-bold border-r border-dashed border-black">${label("No. of Sessions")}</td>
+                            <td class="p-2 outline-none" contenteditable="true" data-field="numSessions">${data.numSessions ?? (data.days.length + " " + label("days"))}</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-2 font-bold border-r border-dashed border-black">References<br><span class="font-normal text-[9px]">(books, websites, toolkits, etc.)</span></td>
+                            <td class="p-2 font-bold border-r border-dashed border-black">${label("References")}<br><span class="font-normal text-[9px]">${label("(books, websites, toolkits, etc.)")}</span></td>
                             <td contenteditable="true" class="p-2 field-editable outline-none" data-field="references">${data.references || ''}</td>
                         </tr>
                         <tr>
-                            <td class="p-2 font-bold border-r border-dashed border-black">Declaration of AI use<br><span class="font-normal text-[9px]">Cite how AI was used in the formulation of the lesson plan.</span></td>
+                            <td class="p-2 font-bold border-r border-dashed border-black">${label("Declaration of AI use")}<br><span class="font-normal text-[9px]">${label("Cite how AI was used in the formulation of the lesson plan.")}</span></td>
                             <td contenteditable="true" class="p-2 field-editable outline-none" data-field="ai_declaration">${data.ai_declaration || ''}</td>
                         </tr>
                     </table>
-                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6 uppercase">INTENTIONS</div>
+                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6 uppercase">${label("INTENTIONS")}</div>
                     <table class="w-full border-collapse border border-black mb-6">
                         <tr class="border-b border-black">
-                            <td class="p-2 font-bold w-1/3 border-r border-dashed border-black text-[11px] font-sans">Learning Competency and Curriculum Standards</td>
-                            <td class="p-2 w-2/3 text-xs outline-none" contenteditable="true" data-field="competency_standard"><ul class="list-disc ml-4 space-y-1">${formattedCompetency}</ul></td>
+                            <td class="p-2 font-bold w-1/3 border-r border-dashed border-black text-[11px] font-sans">${label("Learning Competency and Curriculum Standards")}</td>
+                            <td class="p-2 w-2/3 text-xs outline-none" contenteditable="true" data-field="competency_standard">${data.competency_standard ?? `<ul class="list-disc ml-4 space-y-1">${formattedCompetency}</ul>`}</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-2 font-bold border-r border-dashed border-black text-[11px] font-sans">Learning Objectives</td>
+                            <td class="p-2 font-bold border-r border-dashed border-black text-[11px] font-sans">${label("Learning Objectives")}</td>
                             <td class="p-0 w-2/3 text-xs">
-                                <div class="p-2 border-b border-black"><span class="font-bold">Knowledge:</span> <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_knowledge">${data.objectives.knowledge}</span></div>
-                                <div class="p-2 border-b border-black"><span class="font-bold">Skills:</span> <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_skills">${data.objectives.skills}</span></div>
-                                <div class="p-2"><span class="font-bold">Behavior:</span> <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_behavior">${data.objectives.behavior}</span></div>
+                                <div class="p-2 border-b border-black"><span class="font-bold">${label("Knowledge:")}</span> <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_knowledge">${data.objectives.knowledge}</span></div>
+                                <div class="p-2 border-b border-black"><span class="font-bold">${label("Skills:")}</span> <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_skills">${data.objectives.skills}</span></div>
+                                <div class="p-2"><span class="font-bold">${label("Behavior:")}</span> <span contenteditable="true" class="field-editable outline-none inline" data-field="objectives_behavior">${data.objectives.behavior}</span></div>
                             </td>
                         </tr>
                         <tr>
-                            <td class="p-2 font-bold border-r border-dashed border-black text-[11px] font-sans">Learner Context</td>
+                            <td class="p-2 font-bold border-r border-dashed border-black text-[11px] font-sans">${label("Learner Context")}</td>
                             <td contenteditable="true" class="p-2 w-2/3 text-xs field-editable outline-none min-h-[40px]" data-field="learner_context">${data.learner_context || ''}</td>
                         </tr>
                     </table>
-                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">L. LEARNING EXPERIENCE (KARANASAN SA PAGKATUTO)</div>
+                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">${label("L. LEARNING EXPERIENCE (KARANASAN SA PAGKATUTO)")}</div>
                     <table class="w-full border-collapse border border-black mb-6">
                         <tr class="border-b border-black">
-                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">i. Learning resources (Mga Kagamitan sa Pagkatuto)</td>
+                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">${label("i. Learning resources (Mga Kagamitan sa Pagkatuto)")}</td>
                             <td contenteditable="true" class="p-3 w-2/3 text-xs field-editable outline-none" data-field="resources">${data.resources}</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">ii. Pre-lesson activity (Gawain Bago ang Aralin)</td>
+                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">${label("ii. Pre-lesson activity (Gawain Bago ang Aralin)")}</td>
                             <td contenteditable="true" class="p-3 text-xs text-justify field-editable leading-relaxed outline-none" data-field="pre_lesson">${data.pre_lesson}</td>
                         </tr>
                         <tr class="border-b border-black">
-                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans"><div>iii. Lesson flow (Daloy ng Aralin)</div></td>
+                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans"><div>${label("iii. Lesson flow (Daloy ng Aralin)")}</div></td>
                             <td class="p-4 text-xs">
-                                <div class="space-y-6">${daysHtml}<div class="mt-8 p-4 bg-blue-50/30 border-l-4 border-blue-600"><p class="font-bold text-[10px] uppercase tracking-wider mb-2 font-sans text-blue-900 italic underline">Let's Reflect On It!</p><p contenteditable="true" class="italic text-[12px] leading-relaxed text-blue-950 font-serif field-editable outline-none" data-field="wrap_up">${data.wrap_up}</p></div></div>
+                                <div class="space-y-6">${daysHtml}<div class="mt-8 p-4 bg-blue-50/30 border-l-4 border-blue-600"><p class="font-bold text-[10px] uppercase tracking-wider mb-2 font-sans text-blue-900 italic underline">${label("Let's Reflect On It!")}</p><p contenteditable="true" class="italic text-[12px] leading-relaxed text-blue-950 font-serif field-editable outline-none" data-field="wrap_up">${data.wrap_up}</p></div></div>
                             </td>
                         </tr>
                         <tr>
-                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">iv. Opportunities for integration</td>
+                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">${label("iv. Opportunities for integration")}</td>
                             <td contenteditable="true" class="p-3 text-xs text-justify field-editable outline-none" data-field="integration">${data.integration}</td>
                         </tr>
                     </table>
-                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">A. ASSESSING LEARNING</div>
+                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">${label("A. ASSESSING LEARNING")}</div>
                     <table class="w-full border-collapse border border-black mb-6">
                         <tr>
-                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">i. Formative assessments</td>
+                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">${label("i. Formative assessments")}</td>
                             <td contenteditable="true" class="p-3 w-2/3 text-xs text-justify field-editable leading-relaxed outline-none" data-field="assessment">${data.assessment}</td>
                         </tr>
                     </table>
-                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">W. WAYS FORWARD</div>
+                    <div class="section-header font-sans bg-gray-200 text-black border border-black py-1 px-3 mb-0 mt-6">${label("W. WAYS FORWARD")}</div>
                     <table class="w-full border-collapse border border-black mb-8">
                         <tr class="border-b border-black">
-                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">i. Extended learning opportunities</td>
+                            <td class="p-3 font-bold w-1/3 border-r border-black bg-gray-50 text-[11px] font-sans">${label("i. Extended learning opportunities")}</td>
                             <td contenteditable="true" class="p-3 w-2/3 text-xs text-justify font-serif field-editable leading-relaxed outline-none" data-field="home_task">${data.home_task}</td>
                         </tr>
                         <tr>
-                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">ii. Reflective practice</td>
+                            <td class="p-3 font-bold border-r border-black bg-gray-50 text-[11px] font-sans">${label("ii. Reflective practice")}</td>
                             <td contenteditable="true" class="p-3 w-2/3 text-xs text-justify font-serif field-editable leading-relaxed outline-none" data-field="reflection">${data.reflection}</td>
                         </tr>
                     </table>
-                    <div class="mt-12 font-sans"><div class="w-1/2"><p class="text-xs mb-1">Prepared by:</p><p contenteditable="true" class="font-bold text-sm uppercase underline outline-none" data-field="teacherName">${teacherName}</p><p class="text-[10px]">Teacher I</p></div></div>
+                    <div class="mt-12 font-sans"><div class="w-1/2"><p class="text-xs mb-1">${label("Prepared by:")}</p><p contenteditable="true" class="font-bold text-sm uppercase underline outline-none" data-field="teacherName">${data.teacherName ?? escapeLessonText(teacherName)}</p><p class="text-[10px]">Teacher I</p></div></div>
                 </div>
             `;
         }
@@ -809,6 +870,8 @@
                 const result = await callGenerateDLP(inputs);
                 log("AI response received.", "info");
                 currentParsedData = JSON.parse(result.text.replace(/^```json\n?|```$/gm, '').trim());
+                currentParsedData.output_language = resolveLessonLanguage(currentParsedData, inputs);
+                currentParsedData.ai_declaration = aiUseDeclaration(currentParsedData.output_language);
                 saveToHistory(currentParsedData, inputs);
                 document.getElementById('dlpContent').innerHTML = renderTemplate(currentParsedData, inputs.subject, inputs.gradeLevel, inputs.contentStandard, inputs.performanceStandard, inputs.competency);
                 output.classList.remove('hidden');
