@@ -8,6 +8,7 @@
     <script src="ai-core.js"></script>
     <script src="lesson-language.js"></script>
     <script src="lesson-backup.js"></script>
+    <script src="lesson-editor.js"></script>
     <!-- DOCX Template Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.42.0/docxtemplater.js"></script>
     <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
@@ -215,9 +216,11 @@
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                         <div>
                             <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Generated DLP</h2>
-                            <p class="text-[10px] text-blue-600 font-bold">PRO-TIP: Highlight text below to refine it with AI</p>
+                            <p class="text-[10px] text-blue-600 font-bold">Click lesson text to edit. Edits save automatically. Undo/Redo keeps the last 30 changes per lesson. Highlight text to refine it with AI.</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
+                            <button id="undoLessonBtn" type="button" onclick="moveLessonEdit('undo')" disabled class="bg-slate-100 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold disabled:opacity-40" title="Undo (Ctrl+Z)">Undo</button>
+                            <button id="redoLessonBtn" type="button" onclick="moveLessonEdit('redo')" disabled class="bg-slate-100 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold disabled:opacity-40" title="Redo (Ctrl+Y or Ctrl+Shift+Z)">Redo</button>
                             <button onclick="copyToClipboard()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-all border border-slate-200">Copy Content</button>
                             <button onclick="downloadDoc()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-blue-100 transition-all flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
@@ -227,6 +230,7 @@
                         </div>
                     </div>
 
+                    <div class="no-print flex gap-3 items-center"><p id="lessonSaveStatus" role="status" aria-live="polite" class="text-xs text-slate-500"></p><button id="retryLessonSaveBtn" type="button" onclick="persistLessonEdits()" class="hidden text-xs text-blue-700 underline">Retry save</button></div>
                     <div id="dlpContent" class="bg-white rounded-sm shadow-2xl border border-slate-300 min-h-[1000px]">
                         <!-- Content will be injected here -->
                     </div>
@@ -313,41 +317,7 @@
             alert("Logs copied to clipboard!");
         }
 
-        // Sync manual edits back to data object and persistence
-        document.getElementById('dlpContent').addEventListener('input', function(e) {
-            const field = e.target.getAttribute('data-field');
-            if (field && currentParsedData && currentHistoryId) {
-                const newValue = e.target.innerHTML;
-                
-                if (field.startsWith('day_')) {
-                    const index = parseInt(field.split('_')[1]);
-                    currentParsedData.days[index].content = newValue;
-                } else if (field.startsWith('objectives_')) {
-                    const type = field.split('_')[1];
-                    currentParsedData.objectives[type] = newValue;
-                } else {
-                    currentParsedData[field] = newValue;
-                }
-
-                const item = history.find(h => h.id === currentHistoryId);
-                if (item) {
-                    item.data = currentParsedData;
-                    if (field === 'subject') item.subject = e.target.innerText;
-                    if (field === 'gradeLevel') item.gradeLevel = e.target.innerText;
-                    if (field === 'teacherName') item.teacherName = e.target.innerText;
-                    if (field === 'learningArea' || field === 'gradeLevel') {
-                        document.getElementById('lessonHeading').textContent = lessonHeadingText(
-                            cleanForPlainTextExport(currentParsedData.learningArea || document.getElementById('subject').value),
-                            cleanForPlainTextExport(currentParsedData.gradeLevel || document.getElementById('gradeLevel').value),
-                            resolveLessonLanguage(currentParsedData, item)
-                        );
-                    }
-
-                    localStorage.setItem('dlp_history', JSON.stringify(history));
-                    renderHistoryList();
-                }
-            }
-        });
+        initializeLessonEditor();
 
         function saveToHistory(data, inputs) {
             const newItem = {
@@ -367,6 +337,7 @@
             const updatedHistory = [newItem, ...history];
             localStorage.setItem('dlp_history', JSON.stringify(updatedHistory));
             history = updatedHistory;
+            unsavedLessonEdits = false;
             currentHistoryId = newItem.id;
             localStorage.setItem('last_dlp_id', newItem.id);
             renderHistoryList();
@@ -380,7 +351,7 @@
             list.innerHTML = history.map(item => `
                 <div onclick="loadFromHistory(${item.id})" class="cursor-pointer border ${item.id === currentHistoryId ? 'border-blue-500 bg-blue-50' : 'border-slate-100'} p-3 rounded-lg hover:bg-blue-50 transition-all flex justify-between items-center group">
                     <div>
-                        <p class="font-bold text-xs text-slate-700 group-hover:text-blue-600 transition-colors">${escapeLessonText(item.subject || 'Untitled')}</p>
+                        <p class="font-bold text-xs text-slate-700 group-hover:text-blue-600 transition-colors">${escapeLessonText(cleanForPlainTextExport(item.data.subject ?? item.subject) || 'Untitled')}</p>
                         <p class="text-[9px] text-slate-400 font-medium">${escapeLessonText(item.timestamp)} • Grade ${escapeLessonText(item.gradeLevel)}</p>
                     </div>
                     <button onclick="deleteHistoryItem(event, ${item.id})" class="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
@@ -393,6 +364,7 @@
         function loadFromHistory(id) {
             const item = history.find(h => h.id === id);
             if (!item) return;
+            resetLessonEditGroup();
             currentParsedData = item.data;
             currentParsedData.output_language = resolveLessonLanguage(currentParsedData, item);
             currentHistoryId = id;
@@ -409,6 +381,7 @@
             document.getElementById('emptyState').classList.add('hidden');
             localStorage.setItem('last_dlp_id', id);
             renderHistoryList();
+            refreshLessonEditorUI();
         }
 
         function deleteHistoryItem(e, id) {
@@ -473,9 +446,7 @@
             const lessonData = currentParsedData;
             const item = history.find(h => h.id === lessonId);
             const subject = document.getElementById('subject').value;
-            const dayIndex = field.startsWith('day_') ? Number(field.split('_')[1]) : null;
-            const objective = field.startsWith('objectives_') ? field.slice('objectives_'.length) : null;
-            const context = dayIndex !== null ? lessonData.days[dayIndex].content : objective ? lessonData.objectives[objective] : lessonData[field];
+            const context = readLessonEditField(lessonData, field);
             btn.disabled = true;
             btn.innerText = "REFINING...";
             try {
@@ -489,20 +460,9 @@
                     if (!history.some(h => h.id === lessonId)) throw new Error('This lesson is no longer in history.');
                     const content = field === 'integration' ? sanitizeBackupHtml(newContent) : newContent;
                     if (!content.trim()) throw new Error('The AI returned empty content. Please retry.');
-                    const updatedData = {...lessonData};
-                    if (dayIndex !== null) {
-                        updatedData.days = lessonData.days.map((day, index) => index === dayIndex ? {...day, content} : day);
-                    } else if (objective) {
-                        updatedData.objectives = {...lessonData.objectives, [objective]: content};
-                    } else {
-                        updatedData[field] = content;
-                    }
-                    const updatedHistory = history.map(h => h.id === lessonId ? {...h, data: updatedData} : h);
-                    localStorage.setItem('dlp_history', JSON.stringify(updatedHistory));
-                    history = updatedHistory;
-                    currentParsedData = updatedData;
-                    // Update only the requested field so the rest of the preview stays intact.
-                    document.querySelectorAll('[data-field="' + field + '"]').forEach(el => el.innerHTML = content);
+                    const value = plainLessonEditField(field) ? cleanForPlainTextExport(content) : content;
+                    commitLessonEdit(setLessonEditField(lessonData, field, value), {field, source:'ai'});
+                    syncLessonEditView(field);
                     hideRefine();
                 }
             } catch (e) { alert('Refinement Error: ' + e.message); } finally { btn.disabled = false; btn.innerText = "APPLY CHANGES"; }
@@ -669,7 +629,7 @@
             return [lessonLabel(language, 'LESSON PLAN IN'), subject.toUpperCase(), gradeLevel].filter(Boolean).join(' ');
         }
 
-        function updateWordLessonHeading(xmlDoc, table, subject, gradeLevel, language, wNS) {
+        function updateWordLessonHeading(xmlDoc, table, subject, gradeLevel, language, wNS, termLabel) {
             const siblings = Array.from(table.parentNode.children);
             const paragraphs = siblings.slice(0, siblings.indexOf(table)).filter(node => node.localName === 'p');
             const paragraphText = p => Array.from(p.getElementsByTagNameNS(wNS, 't')).map(t => t.textContent).join('').replace(/\s+/g, ' ').trim();
@@ -685,7 +645,7 @@
             }
             replaceText(heading, lessonHeadingText(subject, gradeLevel, language));
             const term = paragraphs.find(p => paragraphText(p) === 'Term 1 (SY: 2026-2027)');
-            if (term) replaceText(term, lessonLabel(language, 'Term 1 (SY: 2026-2027)'));
+            if (term) replaceText(term, termLabel ?? lessonLabel(language, 'Term 1 (SY: 2026-2027)'));
         }
 
         async function downloadDoc() {
@@ -709,11 +669,11 @@
                 const inputs = { subject: document.getElementById('subject').value, gradeLevel: document.getElementById('gradeLevel').value, competency: document.getElementById('competency').value };
 
                 const dataToExport = {
-                    lessonTitle: getClean(currentParsedData.subject || inputs.subject),
-                    subject: getClean(currentParsedData.learningArea || inputs.subject),
-                    teacherName: getClean(currentParsedData.teacherName || "Jhunrie G. Bayog"),
-                    gradeLevel: getClean(currentParsedData.gradeLevel || inputs.gradeLevel),
-                    sessions: getClean(currentParsedData.numSessions || String(currentParsedData.days?.length || 0)),
+                    lessonTitle: getClean(currentParsedData.subject ?? inputs.subject),
+                    subject: getClean(currentParsedData.learningArea ?? inputs.subject),
+                    teacherName: getClean(currentParsedData.teacherName ?? "Jhunrie G. Bayog"),
+                    gradeLevel: getClean(currentParsedData.gradeLevel ?? inputs.gradeLevel),
+                    sessions: getClean(currentParsedData.numSessions ?? String(currentParsedData.days?.length || 0)),
                     references: getClean(currentParsedData.references),
                     aiDeclaration: getClean(currentParsedData.ai_declaration),
                     competency: getClean(currentParsedData.competency_standard ?? inputs.competency),
@@ -735,7 +695,7 @@
                 flowText += `${label("Let's Reflect On It!")}\n${currentParsedData.wrap_up || ""}`;
                 dataToExport.flow = getClean(flowText);
 
-                updateWordLessonHeading(xmlDoc, table1, dataToExport.subject, dataToExport.gradeLevel, language, wNS);
+                updateWordLessonHeading(xmlDoc, table1, dataToExport.subject, dataToExport.gradeLevel, language, wNS, currentParsedData.termLabel);
 
                 // Populate fields
                 writePlainTextToCell(xmlDoc, getCell(table1, fields.lessonTitle.row, fields.lessonTitle.cell, wNS), dataToExport.lessonTitle, wNS);
@@ -803,7 +763,7 @@
             data.days.forEach((day, index) => {
                 daysHtml += `
                     <div class="mb-6 lesson-segment">
-                        <p class="font-bold underline text-[11px] mb-2 uppercase tracking-tight font-sans">${label("DAY")} ${index + 1}: ${escapeLessonText(day.title)}</p>
+                        <p class="font-bold underline text-[11px] mb-2 uppercase tracking-tight font-sans">${label("DAY")} ${index + 1}: <span contenteditable="true" class="field-editable outline-none" data-field="day_title_${index}">${escapeLessonText(day.title)}</span></p>
                         <div contenteditable="true" class="text-justify field-editable leading-relaxed outline-none" data-field="day_${index}">${day.content}</div>
                     </div>
                 `;
@@ -830,8 +790,8 @@
                     </table>
                     <hr class="border-t border-black mb-4">
                     <div class="text-center mb-6 font-sans">
-                        <p id="lessonHeading" class="font-black text-base uppercase leading-tight">${escapeLessonText(lessonHeadingText(cleanForPlainTextExport(data.learningArea || subject), cleanForPlainTextExport(data.gradeLevel || gradeLevel), language))}</p>
-                        <p class="font-bold text-sm">${label("Term 1 (SY: 2026-2027)")}</p>
+                        <p id="lessonHeading" class="font-black text-base uppercase leading-tight">${escapeLessonText(lessonHeadingText(cleanForPlainTextExport(data.learningArea ?? subject), cleanForPlainTextExport(data.gradeLevel ?? gradeLevel), language))}</p>
+                        <p contenteditable="true" data-field="termLabel" class="font-bold text-sm field-editable outline-none">${escapeLessonText(data.termLabel ?? label("Term 1 (SY: 2026-2027)"))}</p>
                     </div>
                     <table class="w-full border-collapse border border-black mb-6 font-sans text-xs">
                         <tr class="border-b border-black">
@@ -959,6 +919,8 @@
                 saveToHistory(currentParsedData, inputs);
                 document.getElementById('dlpContent').innerHTML = renderTemplate(currentParsedData, inputs.subject, inputs.gradeLevel, inputs.contentStandard, inputs.performanceStandard, inputs.competency);
                 output.classList.remove('hidden');
+                resetLessonEditGroup();
+                refreshLessonEditorUI();
             } catch (error) { 
                 log(`API Error: ${error.message}`, "error"); 
                 alert('API Error: ' + error.message); 

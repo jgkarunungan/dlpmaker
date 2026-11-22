@@ -2,7 +2,7 @@
 const DLP_BACKUP_LIMIT = 10 * 1024 * 1024;
 const DLP_SETUP_FIELDS = ['subject', 'gradeLevel', 'teacherName', 'contentStandard', 'performanceStandard', 'competency', 'userSuggestions', 'numDays', 'selectedModel'];
 const DLP_TEXT_FIELDS = ['ai_declaration', 'references', 'resources', 'pre_lesson', 'wrap_up', 'integration', 'assessment', 'reflection', 'home_task'];
-const DLP_EDIT_FIELDS = ['learner_context', 'subject', 'learningArea', 'teacherName', 'gradeLevel', 'numSessions', 'competency_standard'];
+const DLP_EDIT_FIELDS = ['learner_context', 'subject', 'learningArea', 'teacherName', 'gradeLevel', 'numSessions', 'competency_standard', 'termLabel'];
 
 function escapeLessonText(value) {
     return String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -38,7 +38,7 @@ function backupLessonRecord(item, sanitize = value=>value) {
     }
     const data = {};
     for (const field of DLP_TEXT_FIELDS) data[field] = sanitize(text(item.data[field], field));
-    for (const field of DLP_EDIT_FIELDS) if (item.data[field] !== undefined) data[field] = sanitize(text(item.data[field], field));
+    for (const field of DLP_EDIT_FIELDS) if (item.data[field] !== undefined) data[field] = field === 'termLabel' ? text(item.data[field], field) : sanitize(text(item.data[field], field));
     if (!object(item.data.objectives)) throw new Error('Missing learning objectives.');
     data.objectives = {};
     for (const field of ['knowledge','skills','behavior']) data.objectives[field] = sanitize(text(item.data.objectives[field], 'objectives.' + field));
@@ -140,6 +140,7 @@ async function restoreLessonBackup(input) {
         try { localStorage.setItem('dlp_history',JSON.stringify(result.lessons)); }
         catch { throw new Error('Browser storage is full or unavailable. Existing saved lessons were kept. Keep your JSON backup and free browser storage before trying again.'); }
         history=result.lessons;
+        unsavedLessonEdits=false;
         loadFromHistory(active.id);
         backupStatus('Restored ' + result.added + ' lesson(s); skipped ' + result.skipped + ' existing copy/copies. Existing lessons were kept.');
     } catch(error) { backupStatus(error.message,true); }
