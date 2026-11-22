@@ -335,6 +335,13 @@
                     if (field === 'subject') item.subject = e.target.innerText;
                     if (field === 'gradeLevel') item.gradeLevel = e.target.innerText;
                     if (field === 'teacherName') item.teacherName = e.target.innerText;
+                    if (field === 'learningArea' || field === 'gradeLevel') {
+                        document.getElementById('lessonHeading').textContent = lessonHeadingText(
+                            cleanForPlainTextExport(currentParsedData.learningArea || document.getElementById('subject').value),
+                            cleanForPlainTextExport(currentParsedData.gradeLevel || document.getElementById('gradeLevel').value),
+                            resolveLessonLanguage(currentParsedData, item)
+                        );
+                    }
 
                     localStorage.setItem('dlp_history', JSON.stringify(history));
                     renderHistoryList();
@@ -440,6 +447,16 @@
             }
         });
 
+        // Integration can be revised with a click even when its entire value is N/A.
+        document.getElementById('dlpContent').addEventListener('click', function(e) {
+            if (!e.target.closest('[data-field="integration"]')) return;
+            lastSelectedField = 'integration';
+            const popup = document.getElementById('refinePopup');
+            popup.style.left = Math.max(8, Math.min(e.clientX, window.innerWidth - 350)) + 'px';
+            popup.style.top = Math.max(8, Math.min(e.clientY + 20, window.innerHeight - 200)) + 'px';
+            popup.classList.remove('hidden');
+        });
+
         function hideRefine() {
             document.getElementById('refinePopup').classList.add('hidden');
             document.getElementById('refinePrompt').value = '';
@@ -450,22 +467,42 @@
             const promptText = document.getElementById('refinePrompt').value.trim();
             const btn = document.getElementById('refineBtn');
             const selectedModel = document.getElementById('modelSelect').value;
-            if (!promptText || !lastSelectedField || !currentParsedData) return;
+            if (!promptText || !lastSelectedField || !currentParsedData || btn.disabled) return;
+            const field = lastSelectedField;
+            const lessonId = currentHistoryId;
+            const lessonData = currentParsedData;
+            const item = history.find(h => h.id === lessonId);
+            const subject = document.getElementById('subject').value;
+            const dayIndex = field.startsWith('day_') ? Number(field.split('_')[1]) : null;
+            const objective = field.startsWith('objectives_') ? field.slice('objectives_'.length) : null;
+            const context = dayIndex !== null ? lessonData.days[dayIndex].content : objective ? lessonData.objectives[objective] : lessonData[field];
             btn.disabled = true;
             btn.innerText = "REFINING...";
-            const subject = document.getElementById('subject').value;
-            let context = lastSelectedField.startsWith('day_') ? currentParsedData.days[parseInt(lastSelectedField.split('_')[1])].content : currentParsedData[lastSelectedField];
             try {
-                const newContent = await callRefineSegment({ apiKey, subject, promptText, context, selectedModel });
+                const newContent = await callRefineSegment({
+                    apiKey, subject, promptText, context, selectedModel, field,
+                    lessonFlow: field === 'integration' ? lessonData.days.map(day => ({...day})) : undefined,
+                    outputLanguage: resolveLessonLanguage(lessonData, item || {})
+                });
                 if (newContent) {
-                    if (lastSelectedField.startsWith('day_')) {
-                        currentParsedData.days[parseInt(lastSelectedField.split('_')[1])].content = newContent;
+                    if (currentHistoryId !== lessonId || currentParsedData !== lessonData) throw new Error('The selected lesson changed. Select the section again and retry.');
+                    if (!history.some(h => h.id === lessonId)) throw new Error('This lesson is no longer in history.');
+                    const content = field === 'integration' ? sanitizeBackupHtml(newContent) : newContent;
+                    if (!content.trim()) throw new Error('The AI returned empty content. Please retry.');
+                    const updatedData = {...lessonData};
+                    if (dayIndex !== null) {
+                        updatedData.days = lessonData.days.map((day, index) => index === dayIndex ? {...day, content} : day);
+                    } else if (objective) {
+                        updatedData.objectives = {...lessonData.objectives, [objective]: content};
                     } else {
-                        currentParsedData[lastSelectedField] = newContent;
+                        updatedData[field] = content;
                     }
-                    const item = history.find(h => h.id === currentHistoryId);
-                    if (item) { item.data = currentParsedData; localStorage.setItem('dlp_history', JSON.stringify(history)); }
-                    document.getElementById('dlpContent').innerHTML = renderTemplate(currentParsedData, subject, document.getElementById('gradeLevel').value, document.getElementById('contentStandard').value, document.getElementById('performanceStandard').value, document.getElementById('competency').value, item ? item.teacherName : "Jhunrie G. Bayog");
+                    const updatedHistory = history.map(h => h.id === lessonId ? {...h, data: updatedData} : h);
+                    localStorage.setItem('dlp_history', JSON.stringify(updatedHistory));
+                    history = updatedHistory;
+                    currentParsedData = updatedData;
+                    // Update only the requested field so the rest of the preview stays intact.
+                    document.querySelectorAll('[data-field="' + field + '"]').forEach(el => el.innerHTML = content);
                     hideRefine();
                 }
             } catch (e) { alert('Refinement Error: ' + e.message); } finally { btn.disabled = false; btn.innerText = "APPLY CHANGES"; }
@@ -502,7 +539,7 @@
             let rPr = null;
             if (firstP) {
                 const firstR = firstP.getElementsByTagNameNS(wNS, 'r')[0];
-                if (firstR) rPr = firstR.getElementsByTagNameNS(wNS, 'rPr')[0];
+                rPr = firstR?.getElementsByTagNameNS(wNS, 'rPr')[0] || pPr?.getElementsByTagNameNS(wNS, 'rPr')[0];
             }
             Array.from(cell.childNodes).forEach(child => { if (child.localName !== 'tcPr') cell.removeChild(child); });
             text.split('\n').forEach(line => {
@@ -510,12 +547,6 @@
                 if (pPr) p.appendChild(pPr.cloneNode(true));
                 const r = xmlDoc.createElementNS(wNS, 'w:r');
                 const currentRPr = rPr ? rPr.cloneNode(true) : xmlDoc.createElementNS(wNS, 'w:rPr');
-                let rFonts = currentRPr.getElementsByTagNameNS(wNS, 'rFonts')[0];
-                if (!rFonts) { rFonts = xmlDoc.createElementNS(wNS, 'w:rFonts'); currentRPr.appendChild(rFonts); }
-                rFonts.setAttributeNS(wNS, 'w:ascii', 'Bookman Old Style');
-                rFonts.setAttributeNS(wNS, 'w:hAnsi', 'Bookman Old Style');
-                rFonts.setAttributeNS(wNS, 'w:eastAsia', 'Bookman Old Style');
-                rFonts.setAttributeNS(wNS, 'w:cs', 'Bookman Old Style');
                 r.appendChild(currentRPr);
                 const t = xmlDoc.createElementNS(wNS, 'w:t');
                 t.setAttribute('xml:space', 'preserve');
@@ -536,7 +567,8 @@
             let targetP = ps.find(p => p.textContent.includes(label)) || ps[ps.length - 1];
             if (!targetP) { writePlainTextToCell(xmlDoc, cell, text, wNS); return; }
             const pPr = targetP.getElementsByTagNameNS(wNS, 'pPr')[0];
-            const rPr = targetP.getElementsByTagNameNS(wNS, 'rPr')[0] || (targetP.getElementsByTagNameNS(wNS, 'r')[0]?.getElementsByTagNameNS(wNS, 'rPr')[0]);
+            const templateRuns = Array.from(targetP.getElementsByTagNameNS(wNS, 'r'));
+            const rPr = templateRuns.at(-1)?.getElementsByTagNameNS(wNS, 'rPr')[0] || pPr?.getElementsByTagNameNS(wNS, 'rPr')[0];
             let lastInserted = targetP;
             text.split('\n').forEach(line => {
                 if (!line.trim()) return;
@@ -544,12 +576,6 @@
                 if (pPr) p.appendChild(pPr.cloneNode(true));
                 const r = xmlDoc.createElementNS(wNS, 'w:r');
                 const currentRPr = rPr ? rPr.cloneNode(true) : xmlDoc.createElementNS(wNS, 'w:rPr');
-                let rFonts = currentRPr.getElementsByTagNameNS(wNS, 'rFonts')[0];
-                if (!rFonts) { rFonts = xmlDoc.createElementNS(wNS, 'w:rFonts'); currentRPr.appendChild(rFonts); }
-                rFonts.setAttributeNS(wNS, 'w:ascii', 'Bookman Old Style');
-                rFonts.setAttributeNS(wNS, 'w:hAnsi', 'Bookman Old Style');
-                rFonts.setAttributeNS(wNS, 'w:eastAsia', 'Bookman Old Style');
-                rFonts.setAttributeNS(wNS, 'w:cs', 'Bookman Old Style');
                 r.appendChild(currentRPr);
                 const t = xmlDoc.createElementNS(wNS, 'w:t');
                 t.setAttribute('xml:space', 'preserve');
@@ -568,42 +594,98 @@
             return cells[c];
         }
 
+        // Replace wording across split Word runs without rebuilding any formatting.
+        function replaceWordTemplateText(element, source, replacement, wNS) {
+            const texts = Array.from(element.getElementsByTagNameNS(wNS, 't'));
+            const joined = texts.map(t => t.textContent).join('');
+            const positions = [];
+            let compact = '';
+            for (let index = 0; index < joined.length; index++) {
+                if (!/\s/.test(joined[index])) { compact += joined[index]; positions.push(index); }
+            }
+            const needle = source.replace(/\s/g, '');
+            const match = compact.indexOf(needle);
+            if (match < 0) throw new Error('Template label not found: ' + source);
+            const start = positions[match], end = positions[match + needle.length - 1] + 1;
+            let offset = 0, inserted = false;
+            for (const node of texts) {
+                const value = node.textContent, next = offset + value.length;
+                if (next > start && offset < end) {
+                    const from = Math.max(0, start - offset), to = Math.min(value.length, end - offset);
+                    node.textContent = value.slice(0, from) + (inserted ? '' : replacement) + value.slice(to);
+                    inserted = true;
+                }
+                offset = next;
+            }
+        }
+
         function localizeFilipinoWordLabels(xmlDoc, table, fields, data, wNS) {
             const label = text => lessonLabel('fil', text);
-            const fieldLabels = {
-                lessonTitle: 'Lesson Title', subject: 'Learning Area/s',
-                teacherName: 'Name of Teacher/s', gradeLevel: 'Grade Level and Section',
-                sessions: 'No. of Sessions', competency: 'Learning Competency and Curriculum Standards',
-                learnerContext: 'Learner Context', preLesson: 'ii. Pre-lesson activity (Gawain Bago ang Aralin)',
-                integration: 'iv. Opportunities for integration', assessment: 'i. Formative assessments',
-                extendedLearning: 'i. Extended learning opportunities', reflection: 'ii. Reflective practice'
-            };
-            for (const [field, text] of Object.entries(fieldLabels)) {
-                writePlainTextToCell(xmlDoc, getCell(table, fields[field].row, 0, wNS), label(text), wNS);
+            const translate = (row, source, target, cell = 0) =>
+                replaceWordTemplateText(getCell(table, row, cell, wNS), source, target, wNS);
+            const labels = [
+                ['lessonTitle','Lesson Title','Lesson Title'], ['subject','Learning Area/s','Learning Area/s'],
+                ['teacherName','Name of Teacher/s','Name of Teacher/s'], ['gradeLevel','Grade Level and Section','Grade Level and Section'],
+                ['sessions','No. of Sessions','No. of Sessions'], ['competency','Learning Competency and Curriculum Standards','Learning Competency and Curriculum Standards'],
+                ['learnerContext','Learner Context','Learner Context'], ['knowledge','Learning Objectives','Learning Objectives'],
+                ['resources','Learning Resources','i. Learning resources (Mga Kagamitan sa Pagkatuto)'],
+                ['preLesson','Pre-Lesson','ii. Pre-lesson activity (Gawain Bago ang Aralin)'],
+                ['flow','Flow','iii. Lesson flow (Daloy ng Aralin)'],
+                ['integration','Opportunities for integration','iv. Opportunities for integration'],
+                ['assessment','Formative Assessment','i. Formative assessments'],
+                ['extendedLearning','Extended learning opportunities','i. Extended learning opportunities'],
+                ['reflection','Reflections','ii. Reflective practice']
+            ];
+            for (const [field, source, target] of labels) translate(fields[field].row, source, label(target));
+            translate(fields.references.row, 'References', label('References'));
+            translate(fields.references.row, '(books, websites, toolkits, etc.)', label('(books, websites, toolkits, etc.)'));
+            translate(fields.aiDeclaration.row, 'Declaration of AI use', label('Declaration of AI use'));
+            translate(fields.aiDeclaration.row, 'Cite how AI was used in the formulation of the lesson plan.', label('Cite how AI was used in the formulation of the lesson plan.'));
+            // Keep the original hyperlink, color, underline, and smaller note text.
+            translate(fields.aiDeclaration.row, 'See', 'Tingnan ang');
+            translate(fields.reflection.row, '(to be accomplished after finishing the lesson)', '(sasagutan pagkatapos ng aralin)');
+            for (const [field, source] of [['knowledge','Knowledge'], ['skills','Skills'], ['behavior','Behavior']]) {
+                translate(fields[field].row, source, label(source + ':').slice(0, -1), fields[field].cell);
             }
-            const writeLabel = (row, text) => writePlainTextToCell(xmlDoc, getCell(table, row, 0, wNS), text, wNS);
-            writeLabel(fields.references.row, label('References') + '\n' + label('(books, websites, toolkits, etc.)'));
-            writeLabel(fields.aiDeclaration.row, label('Declaration of AI use') + '\n' + label('Cite how AI was used in the formulation of the lesson plan.') + '\n(Tingnan ang DO 3 s.2026 Annex A.)');
-            writeLabel(fields.knowledge.row, label('Learning Objectives'));
-            for (const [field, english] of [['knowledge', 'Knowledge:'], ['skills', 'Skills:'], ['behavior', 'Behavior:']]) {
-                writePlainTextToCell(xmlDoc, getCell(table, fields[field].row, fields[field].cell, wNS), label(english) + '\n' + data[field], wNS);
+            const flowNotes = [
+                ['Make the objectives clear for all learners', 'Linawin ang mga layunin para sa lahat ng mag-aaral'],
+                ['Guide learners before letting them try the task on their own', 'Gabayan ang mga mag-aaral bago nila subukan ang gawain nang mag-isa'],
+                ['Check the state of the learners’ well-being, understanding, and mastery over the lesson', 'Suriin ang kalagayan, pag-unawa, at pagkatuto ng mga mag-aaral'],
+                ['Connect today’s new concept to past competencies', 'Iugnay ang bagong konsepto sa mga naunang kasanayan'],
+                ['Encourage collaboration among learners', 'Hikayatin ang pagtutulungan ng mga mag-aaral'],
+                ['Invite learners to reflect on why these matter to them', 'Anyayahan silang pagnilayan ang kabuluhan ng mga natutuhan'],
+                ['Ensure inclusion for learners’ varied abilities, learning styles, and contexts', 'Isaalang-alang ang iba’t ibang kakayahan, paraan ng pagkatuto, at kalagayan ng mga mag-aaral']
+            ];
+            for (const [source, target] of flowNotes) translate(fields.flow.row, source, target);
+            for (const [row, source, target] of [
+                [fields.competency.row - 1, 'INTENTIONS', 'INTENTIONS'],
+                [fields.resources.row - 1, 'LEARNING EXPERIENCE', 'L. LEARNING EXPERIENCE (KARANASAN SA PAGKATUTO)'],
+                [fields.assessment.row - 1, 'ASSESSMENT', 'A. ASSESSING LEARNING'],
+                [fields.extendedLearning.row - 1, 'WAYS FORWARD', 'W. WAYS FORWARD']
+            ]) translate(row, source, label(target));
+        }
+
+        function lessonHeadingText(subject, gradeLevel, language) {
+            return [lessonLabel(language, 'LESSON PLAN IN'), subject.toUpperCase(), gradeLevel].filter(Boolean).join(' ');
+        }
+
+        function updateWordLessonHeading(xmlDoc, table, subject, gradeLevel, language, wNS) {
+            const siblings = Array.from(table.parentNode.children);
+            const paragraphs = siblings.slice(0, siblings.indexOf(table)).filter(node => node.localName === 'p');
+            const paragraphText = p => Array.from(p.getElementsByTagNameNS(wNS, 't')).map(t => t.textContent).join('').replace(/\s+/g, ' ').trim();
+            const heading = paragraphs.find(p => /^(LESSON PLAN IN|BANGHAY-ARALIN SA)\b/i.test(paragraphText(p)));
+            if (!heading) throw new Error('The lesson heading was not found in the school template.');
+            function replaceText(paragraph, value) {
+                const texts = Array.from(paragraph.getElementsByTagNameNS(wNS, 't'));
+                texts[0].textContent = value;
+                texts[0].setAttribute('xml:space', 'preserve');
+                texts.slice(1).forEach(t => t.textContent = '');
+                // Remove the template's forced break after its sample subject.
+                Array.from(paragraph.getElementsByTagNameNS(wNS, 'br')).forEach(br => br.remove());
             }
-            writeLabel(fields.resources.row, label('i. Learning resources (Mga Kagamitan sa Pagkatuto)'));
-            writeLabel(fields.flow.row, label('iii. Lesson flow (Daloy ng Aralin)') + '\n' + [
-                'Linawin ang mga layunin para sa lahat ng mag-aaral.',
-                'Gabayan ang mga mag-aaral bago nila subukan ang gawain nang mag-isa.',
-                'Suriin ang kalagayan, pag-unawa, at pagkatuto ng mga mag-aaral.',
-                'Iugnay ang bagong konsepto sa mga naunang kasanayan.',
-                'Hikayatin ang pagtutulungan ng mga mag-aaral.',
-                'Anyayahan silang pagnilayan ang kabuluhan ng mga natutuhan.',
-                'Isaalang-alang ang iba’t ibang kakayahan, paraan ng pagkatuto, at kalagayan ng mga mag-aaral.'
-            ].join('\n'));
-            for (const [row, english] of [
-                [fields.competency.row - 1, 'INTENTIONS'],
-                [fields.resources.row - 1, 'L. LEARNING EXPERIENCE (KARANASAN SA PAGKATUTO)'],
-                [fields.assessment.row - 1, 'A. ASSESSING LEARNING'],
-                [fields.extendedLearning.row - 1, 'W. WAYS FORWARD']
-            ]) writeLabel(row, label(english));
+            replaceText(heading, lessonHeadingText(subject, gradeLevel, language));
+            const term = paragraphs.find(p => paragraphText(p) === 'Term 1 (SY: 2026-2027)');
+            if (term) replaceText(term, lessonLabel(language, 'Term 1 (SY: 2026-2027)'));
         }
 
         async function downloadDoc() {
@@ -652,6 +734,8 @@
                 currentParsedData.days.forEach((day, i) => { flowText += `${label("DAY")} ${i + 1}: ${day.title}\n${day.content}\n\n`; });
                 flowText += `${label("Let's Reflect On It!")}\n${currentParsedData.wrap_up || ""}`;
                 dataToExport.flow = getClean(flowText);
+
+                updateWordLessonHeading(xmlDoc, table1, dataToExport.subject, dataToExport.gradeLevel, language, wNS);
 
                 // Populate fields
                 writePlainTextToCell(xmlDoc, getCell(table1, fields.lessonTitle.row, fields.lessonTitle.cell, wNS), dataToExport.lessonTitle, wNS);
@@ -746,7 +830,7 @@
                     </table>
                     <hr class="border-t border-black mb-4">
                     <div class="text-center mb-6 font-sans">
-                        <p class="font-black text-base uppercase leading-tight">${label("LESSON PLAN IN")} ${escapeLessonText(subject.toUpperCase())} ${escapeLessonText(gradeLevel)}</p>
+                        <p id="lessonHeading" class="font-black text-base uppercase leading-tight">${escapeLessonText(lessonHeadingText(cleanForPlainTextExport(data.learningArea || subject), cleanForPlainTextExport(data.gradeLevel || gradeLevel), language))}</p>
                         <p class="font-bold text-sm">${label("Term 1 (SY: 2026-2027)")}</p>
                     </div>
                     <table class="w-full border-collapse border border-black mb-6 font-sans text-xs">
